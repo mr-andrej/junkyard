@@ -1,0 +1,42 @@
+[Unit]
+Description=JUNKyard - Lightweight Log Aggregator
+Documentation=https://github.com/mr-andrej/junkyard
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=junkyard
+Group=junkyard
+WorkingDirectory=/var/lib/junkyard
+
+# Start service
+ExecStart=/usr/local/bin/junkyard-server \
+    --http-addr :8080 \
+    --syslog-addr :5514 \
+    --db-path /var/lib/junkyard/logs.db \
+    --retention-days 14 \
+    --log-level info
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+
+# Resource limits
+MemoryLimit=200M
+CPUQuota=50%
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/junkyard /var/log
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=junkyard
+
+[Install]
+WantedBy=multi-user.target

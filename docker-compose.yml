@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  junkyard:
+    build: .
+    container_name: junkyard
+    ports:
+      - "8080:8080"
+      - "5514:5514"
+    environment:
+      JUNKYARD_HTTP_ADDR: "0.0.0.0:8080"
+      JUNKYARD_SYSLOG_ADDR: "0.0.0.0:5514"
+      JUNKYARD_DB_PATH: "/var/lib/junkyard/logs.db"
+      JUNKYARD_RETENTION_DAYS: "14"
+      JUNKYARD_LOG_LEVEL: "info"
+    volumes:
+      - junkyard-data:/var/lib/junkyard
+    networks:
+      - junkyard-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  # Example: Log generator for testing
+  log-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    container_name: junkyard-generator
+    depends_on:
+      junkyard:
+        condition: service_healthy
+    environment:
+      JUNKYARD_SERVER: "http://junkyard:8080"
+    networks:
+      - junkyard-net
+    restart: unless-stopped
+
+volumes:
+  junkyard-data:
+
+networks:
+  junkyard-net:
+    driver: bridge
