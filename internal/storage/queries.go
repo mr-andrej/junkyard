@@ -39,8 +39,13 @@ func (db *DB) Query(opts QueryOptions) ([]LogEntry, error) {
 	}
 
 	if opts.Search != "" {
-		// Use FTS5 for full-text search
-		conditions = append(conditions, "id IN (SELECT rowid FROM logs_fts WHERE message MATCH ?)")
+		// Use FTS5 for full-text search if available, otherwise fall back to LIKE
+		if db.hasFTS5 {
+			conditions = append(conditions, "id IN (SELECT rowid FROM logs_fts WHERE message MATCH ?)")
+		} else {
+			conditions = append(conditions, "message LIKE ?")
+			opts.Search = "%" + opts.Search + "%"
+		}
 		args = append(args, opts.Search)
 	}
 
