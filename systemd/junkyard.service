@@ -15,12 +15,13 @@ ExecStart=/usr/local/bin/junkyard-server \
     --http-addr :8080 \
     --syslog-addr :5514 \
     --db-path /var/lib/junkyard/logs.db \
-    --retention-days 14 \
-    --log-level info
+    --retention-days 30
 
 # Restart policy
 Restart=on-failure
 RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
 
 # Resource limits
 MemoryLimit=200M
