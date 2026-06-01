@@ -73,6 +73,17 @@ cp "$BINARY" "$JUNKYARD_BIN"
 chmod 755 "$JUNKYARD_BIN"
 log_info "Binary installed to $JUNKYARD_BIN"
 
+# 3b. Copy CLI binary if it exists
+if [ -f "bin/junk" ]; then
+    sudo cp bin/junk /usr/local/bin/junk
+    chmod 755 /usr/local/bin/junk
+    log_info "CLI binary installed to /usr/local/bin/junk"
+elif [ -f "bin/junk.exe" ]; then
+    sudo cp bin/junk.exe /usr/local/bin/junk
+    chmod 755 /usr/local/bin/junk
+    log_info "CLI binary installed to /usr/local/bin/junk"
+fi
+
 # 4. Install systemd service file
 log_info "Installing systemd service..."
 if [ -f "systemd/junkyard.service" ]; then

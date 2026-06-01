@@ -447,7 +447,7 @@ func cmdHealth(args []string) {
 	fmt.Printf("%-20s %s\n", color.GreenString("Status:"), successColor.Sprint(health["status"]))
 	fmt.Printf("%-20s %s\n", color.GreenString("Version:"), health["version"])
 	fmt.Printf("%-20s %s\n", color.GreenString("Hostname:"), health["hostname"])
-	fmt.Printf("%-20s %v\n", color.GreenString("Uptime:"), health["uptime_seconds"])
+	fmt.Printf("%-20s %vs\n", color.GreenString("Uptime:"), health["uptime_seconds"])
 
 	if db, ok := health["database"].(map[string]interface{}); ok {
 		fmt.Println()
