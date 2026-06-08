@@ -112,6 +112,7 @@ var hostMap = map[string] string {
     "10.0.10.254": "s1-fw",
     "10.0.10.1": "s1-app",
     "10.0.20.1": "s1-db",
+    "172.16.0.2": "s1-fw",
 }
 
 func resolveHost(ip string) string {
