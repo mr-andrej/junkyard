@@ -1,52 +1,53 @@
-﻿# 🗑️ JUNKyard - Centralized Log Aggregation System
+# JUNKyard - Centralized Log Aggregation System
 
 > "Throw all your logs into the junkyard."
 
-JUNKyard is a lightweight, efficient, Go-based log aggregation system designed for centralized log collection across multiple VMs in a CIA academic project environment. It provides a beautiful web UI, powerful query capabilities, and full-text search across logs from distributed sources.
+JUNKyard is a lightweight, Go-based log aggregation system designed for centralized log collection across multiple VMs in a CIA academic project environment. It provides a web UI, powerful query capabilities, and full-text search across logs from distributed sources.
 
 ![JUNKyard Dashboard](https://i.imgur.com/pzfycnd.png)
 
 ## Features
 
-- **📊 Centralized Collection** - Single monitoring VM aggregates logs from all infrastructure
-- **🚀 High Performance** - SQLite with WAL mode for concurrent read performance during writes
-- **🔍 Full-Text Search** - FTS5 integration with automatic indexing
-- **🌐 Multiple Ingestion Methods**:
-  - **Syslog (RFC 3164)** - TCP port 5514 for traditional log forwarding
+- **Centralized Collection** - Single monitoring VM aggregates logs from all infrastructure
+- **High Performance** - SQLite with WAL mode for concurrent read performance during writes
+- **Full-Text Search** - FTS5 integration with automatic indexing (falls back to LIKE search if FTS5 unavailable)
+- **Multiple Ingestion Methods**:
+  - **Syslog (RFC 3164)** - TCP and UDP on port 5514 for traditional log forwarding
   - **HTTP API** - POST to `/api/ingest` for single or batch logs
   - **Direct POST** - Application-native log submission
-- **📱 "Beautiful" Web UI** - Dark-themed dashboard with real-time stats and filtering
-- **⚡ REST API** - Comprehensive endpoints for programmatic access
-- **💾 Efficient Storage** - ~100MB RAM consumption target, configurable retention
-- **🛡️ Zero-Impact Collection** - Source VMs need only rsyslog config change (1 line)
-- **🔧 Production Ready** - Systemd integration, graceful shutdown, health checks
+- **Web UI** - Dark-themed dashboard with real-time stats and filtering
+- **REST API** - Comprehensive endpoints for programmatic access
+- **pfSense Compatible** - UDP syslog support with automatic hostname resolution
+- **Production Ready** - Systemd integration, graceful shutdown, health checks
 
 ## Architecture
 
-### Centralized Design
-- **JUNKyard Server**: Runs exclusively on **S2-MT** (monitoring VM at 192.168.20.X)
-- **Log Sources**: All other VMs forward logs via pre-installed rsyslog:
-  - S1-APP (application)
-  - S1-DB (database)
-  - S1-FW (firewall)
-  - S2-FW (firewall)
-  - S2-JS (jump server/bastion)
+JUNKyard runs exclusively on S2-MT (`192.168.20.1`) and receives logs from all other VMs.
+
+| VM | IP | Method | Protocol |
+|----|----|--------|----------|
+| S1-APP | `10.0.10.1` | rsyslog | TCP |
+| S1-DB | `10.0.20.1` | rsyslog | TCP |
+| S1-FW | `172.16.0.2` (tunnel) | pfSense remote syslog | UDP |
+| S2-FW | `192.168.20.254` | pfSense remote syslog | UDP |
+| S2-JS | `192.168.10.10` | rsyslog | TCP |
 
 ### System Diagram
+
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │    S1-APP VM    │     │    S1-DB VM     │     │    S1-FW VM     │     │    S2-FW VM     │     │    S2-JS VM     │
-│   (rsyslog)     │     │   (rsyslog)     │     │   (rsyslog)     │     │   (rsyslog)     │     │   (rsyslog)     │
+│   (rsyslog)     │     │   (rsyslog)     │     │   (pfSense)     │     │   (pfSense)     │     │   (rsyslog)     │
 └────────┬────────┘     └────────┬────────┘     └────────┬────────┘     └────────┬────────┘     └────────┬────────┘
          │                       │                       │                       │                       │
          │ TCP 5514              │ TCP 5514              │ UDP 5514              │ UDP 5514              │ TCP 5514
          └───────────────────────┼───────────────────────┼───────────────────────┼───────────────────────┘
                                  │
                     ┌────────────▼────────────┐
-                    │  S2-MT (Monitoring)     │
+                    │  S2-MT (192.168.20.1)   │
                     │  JUNKyard Server        │
-                    │  - Syslog Listener      │
-                    │  - HTTP API (8080)      │
+                    │  - TCP+UDP Syslog :5514 │
+                    │  - HTTP API       :8080 │
                     │  - SQLite Database      │
                     │  - Web UI Dashboard     │
                     └────────────┬────────────┘
@@ -63,57 +64,39 @@ JUNKyard is a lightweight, efficient, Go-based log aggregation system designed f
 
 ## Installation Guide
 
-This section covers deploying JUNKyard on the monitoring VM (S2-MT) and configuring all source VMs to forward logs.
-
-### 1. On Your Build Machine or Proxmox VM
-
-Clone the repository and build the binaries for Linux:
+### 1. Clone and Build
 
 ```bash
-# Clone/download the junkyard repository
 git clone https://github.com/mr-andrej/junkyard.git
 cd junkyard
 
-# Build for Linux (if on Linux/Proxmox)
 go build -o bin/junkyard-server ./cmd/junkyard-server
 go build -o bin/junk ./cmd/junkyard-cli
 ```
 
-### 2. Run Automated Deployment
-
-Use the provided deployment script to install and configure JUNKyard on S2-MT:
+### 2. Deploy on S2-MT
 
 ```bash
-# Make script executable
 chmod +x scripts/deploy-s2-mt.sh
-
-# Run as root
 sudo bash scripts/deploy-s2-mt.sh
 ```
 
 The script will automatically:
-
-- ✅ Create the `junkyard` user and directories
-- ✅ Install the binary to `/usr/local/bin`
-- ✅ Set up the systemd service
-- ✅ Configure firewall rules (UFW)
-- ✅ Start the service
-- ✅ Verify operation
+- Create the `junkyard` user and directories
+- Install the binary to `/usr/local/bin`
+- Set up the systemd service
+- Configure firewall rules (UFW)
+- Start the service
 
 ### 3. Verify It's Running
 
 ```bash
-# Check service status
-sudo systemctl status junkyard
-
-# Test CLI
+sudo systemctl status junkyard.service
 junk health
-
-# View live logs
-journalctl -u junkyard -f
+journalctl -u junkyard.service -f
 ```
 
-A healthy `junk health` response looks like:
+A healthy `junk health` response:
 
 ```json
 {
@@ -122,7 +105,7 @@ A healthy `junk health` response looks like:
   "hostname": "s2-mt",
   "uptime_seconds": 3600,
   "database": {
-    "path": "/var/lib/junkyard/junkyard.db",
+    "path": "/var/lib/junkyard/logs.db",
     "size_mb": 0.1,
     "total_logs": 0
   }
@@ -131,124 +114,111 @@ A healthy `junk health` response looks like:
 
 ### 4. Configure Source VMs
 
-For each VM that should send logs (S1-APP, S1-DB, S1-FW, S2-FW, S2-JS), write the rsyslog forwarding rule and restart rsyslog. Replace `192.168.20.1` with the actual IP address of S2-MT.
+#### Linux VMs (S1-APP, S1-DB, S2-JS)
 
 ```bash
-# Get S2-MT IP from the deployment output (192.168.20.1)
-# Then on each source VM:
-
 sudo tee /etc/rsyslog.d/99-junkyard.conf > /dev/null <<'EOF'
 *.* @@192.168.20.1:5514
 EOF
 
-# Replace 192.168.20.1 with actual S2-MT IP
-
 sudo systemctl restart rsyslog
-```
-
-> **Note:** The double `@@` means TCP. A single `@` would use UDP. TCP is strongly preferred here so logs are not silently dropped under load.
-
-To verify a source VM is forwarding:
-
-```bash
-# Confirm an established TCP connection to S2-MT:5514
 sudo netstat -tn | grep 5514
+# Should show ESTABLISHED
 ```
+
+> The double `@@` means TCP. A single `@` would use UDP.
+
+> If `netstat` is not found: `sudo apt-get install net-tools`
+
+#### pfSense VMs (S1-FW, S2-FW)
+
+**Status → System Logs → Settings → Remote Logging**
+
+- **Enable Remote Logging**: checked
+- **Remote log servers**: `192.168.20.1:5514`
+- **Remote Syslog Contents**: `Everything`
+- Click **Save**
+
+> pfSense sends syslog over UDP even when a custom port is specified. JUNKyard handles this natively.
 
 ### 5. Test Log Ingestion
 
-From any source VM, send a test log using the standard `logger` utility:
-
 ```bash
+# From any Linux source VM:
 logger -t test-vm -p user.info "Test log from $(hostname)"
-```
 
-Then on S2-MT, confirm the log arrived:
-
-```bash
+# Then on S2-MT:
 junk logs --limit 5
 ```
 
-You should see an entry from the source VM's hostname within a few seconds. If nothing appears, see [Troubleshooting](#troubleshooting).
-
 ### 6. Access the Web UI
 
-Open a browser and navigate to:
-
 ```
-http://192.168.20.X:8080
+http://192.168.20.1:8080
 ```
 
-Replace `192.168.20.X` with the actual IP of S2-MT. The dashboard shows real-time stats, log counts by host and level, and a searchable, filterable log table.
+Access requires VPN. No direct WAN exposure.
 
 ---
 
-## Alternative Installation Methods
+## Required Firewall Rules
 
-### Binary (Quick Start)
-```bash
-wget https://github.com/mr-andrej/junkyard/releases/latest/download/junkyard-server
-chmod +x junkyard-server
-./junkyard-server --http-addr :8080 --syslog-addr :5514 --db-path ./junkyard.db
-open http://localhost:8080
-```
+### Site 1 pfSense (`5.196.50.51`)
 
-### Docker
-```bash
-docker build -t junkyard:latest .
-docker run -d \
-  -p 8080:8080 \
-  -p 5514:5514/tcp \
-  -v junkyard-data:/data \
-  junkyard:latest
-```
+| Interface | Protocol | Source | Destination | Port | Purpose |
+|-----------|----------|--------|-------------|------|---------|
+| OPT1 | IPv4 TCP | `10.0.10.0/24` | `192.168.20.0/24` | `*` | S1-APP syslog |
+| OPT2 | IPv4 TCP | `10.0.20.0/24` | `192.168.20.1/32` | `5514` | S1-DB syslog |
+| OpenVPN | IPv4 TCP/UDP | `172.16.0.0/30` | `192.168.20.1/32` | `5514` | S1-FW syslog (tunnel IP) |
 
-### Manual (Ubuntu 24.04 LTS)
+### Site 2 pfSense (`5.196.45.7`)
 
-1. **Install dependencies**
-   ```bash
-   sudo apt-get update
-   sudo apt-get install -y golang-1.21 git sqlite3
-   ```
-
-2. **Build executable**
-   ```bash
-   make build-linux
-   ```
-
-3. **Create system user**
-   ```bash
-   sudo useradd -r -s /bin/false junkyard
-   ```
-
-4. **Install binary**
-   ```bash
-   sudo cp bin/junkyard-server /usr/local/bin/
-   ```
-
-5. **Setup database directory**
-   ```bash
-   sudo mkdir -p /var/lib/junkyard
-   sudo chown junkyard:junkyard /var/lib/junkyard
-   ```
-
-6. **Enable systemd service**
-   ```bash
-   sudo cp systemd/junkyard.service /etc/systemd/system/
-   sudo systemctl daemon-reload
-   sudo systemctl enable junkyard
-   sudo systemctl start junkyard
-   ```
+| Interface | Protocol | Source | Destination | Port | Purpose |
+|-----------|----------|--------|-------------|------|---------|
+| OPT1 | IPv4 TCP | `192.168.10.0/24` | `192.168.20.1/32` | `5514` | S2-JS syslog |
+| OpenVPN | IPv4 TCP/UDP | `172.16.0.0/30` | `192.168.20.1/32` | `5514` | S1-FW tunnel replies |
 
 ---
 
 ## Usage
 
+### CLI
+
+```
+🗑️  JUNKyard CLI v1.0.0
+Usage: junk <command> [options]
+
+Commands:
+  logs    - Display recent logs with filtering
+  stream  - Stream logs in real-time (polls every 5s)
+  stats   - Show log statistics and breakdown
+  search  - Full-text search across logs
+  graph   - Display log trends as ASCII graph
+  health  - Check server health
+
+Global Options:
+  --host      Filter by hostname
+  --source    Filter by source (syslog, http, etc.)
+  --level     Filter by level (debug, info, warning, error)
+  --limit     Limit number of results (default: 100)
+  --hours     Time range in hours (default: 24)
+  --server    API server address (default: http://localhost:8080)
+
+Examples:
+  junk logs                              # Last 100 logs
+  junk logs --host s1-app --level error  # Errors on S1-APP
+  junk search "database"                 # Full-text search
+  junk graph --hours 24                  # Last 24 hours
+  junk stream                            # Real-time streaming
+  junk stats                             # Statistics
+  junk health                            # Server status
+```
+
 ### Web UI
 
-Navigate to `http://junkyard-server:8080` to access the dashboard.
+Navigate to `http://192.168.20.1:8080`.
 
-**Features:**
+Features:
 - Real-time statistics (total logs, errors, warnings, database size)
 - Full-text search across log messages
 - Filter by host, source, or log level
@@ -258,80 +228,51 @@ Navigate to `http://junkyard-server:8080` to access the dashboard.
 
 ### REST API
 
-#### Query Logs
 ```bash
-# Get recent 100 logs
+# Recent logs
 curl http://localhost:8080/api/logs?limit=100
 
 # Filter by host and level
-curl 'http://localhost:8080/api/logs?host=S1-APP&level=error'
+curl 'http://localhost:8080/api/logs?host=s1-app&level=error'
 
 # Full-text search
 curl 'http://localhost:8080/api/logs?search=connection%20timeout'
 
-# Time range query
+# Time range
 curl 'http://localhost:8080/api/logs?start=2026-05-07T00:00:00Z&end=2026-05-07T23:59:59Z'
-```
 
-#### Get Statistics
-```bash
+# Stats
 curl http://localhost:8080/api/stats
-```
 
-#### Get Time Series Data
-```bash
-# Log volume over last 24 hours (hourly intervals)
-curl 'http://localhost:8080/api/timeseries?interval=hour&hours=24'
+# Health
+curl http://localhost:8080/health
 
-# 15-minute intervals for last 6 hours
-curl 'http://localhost:8080/api/timeseries?interval=15min&hours=6'
-```
-
-#### Ingest Single Log
-```bash
+# Ingest single log
 curl -X POST http://localhost:8080/api/ingest \
   -H "Content-Type: application/json" \
-  -d '{
-    "host": "S1-APP",
-    "source": "http",
-    "level": "error",
-    "message": "Database connection failed",
-    "timestamp": "2026-05-07T15:30:00Z"
-  }'
-```
+  -d '{"host":"s1-app","source":"http","level":"error","message":"test"}'
 
-#### Ingest Batch Logs
-```bash
+# Ingest batch
 curl -X POST http://localhost:8080/api/ingest/batch \
   -H "Content-Type: application/json" \
-  -d '[
-    {"host": "S1-APP", "message": "Log 1"},
-    {"host": "S1-DB", "message": "Log 2"},
-    {"host": "S1-FW", "message": "Log 3"}
-  ]'
-```
-
-#### Health Check
-```bash
-curl http://localhost:8080/health
-```
-
-### Command Line Options
-
-```
-junkyard-server [flags]
-
-FLAGS:
-  -http-addr string      HTTP server address (default ":8080")
-  -syslog-addr string    Syslog server address (default ":5514")
-  -db-path string        SQLite database path (default "./junkyard.db")
-  -retention-days int    Log retention period in days (default 14)
-  -version               Print version and exit
+  -d '[{"host":"s1-app","message":"log 1"},{"host":"s1-db","message":"log 2"}]'
 ```
 
 ---
 
 ## Configuration
+
+### Command Line Flags
+
+```
+junkyard-server [flags]
+
+  -http-addr string      HTTP server address (default ":8080")
+  -syslog-addr string    Syslog server address (default ":5514")
+  -db-path string        SQLite database path (default "./junkyard.db")
+  -retention-days int    Log retention in days (default 14)
+  -version               Print version and exit
+```
 
 ### Environment Variables
 
@@ -342,22 +283,13 @@ export DB_PATH="/var/lib/junkyard/junkyard.db"
 export RETENTION_DAYS="14"
 ```
 
-### Database Settings
-
-JUNKyard uses SQLite with optimizations for log aggregation:
-
-- **WAL Mode** — Enabled for concurrent read performance during writes
-- **Synchronous** — NORMAL mode (balance between safety and speed)
-- **Cache** — Shared cache for efficiency
-- **Indexes** — Compound `(host, timestamp)`, single `(timestamp DESC, host, level, source)`, and FTS5 on message content
-
 ### Systemd Service
 
 Edit `/etc/systemd/system/junkyard.service` to customize resource limits:
 
 ```ini
 [Service]
-MemoryLimit=500M
+MemoryMax=500M
 CPUQuota=100%
 Restart=on-failure
 RestartSec=10s
@@ -365,114 +297,70 @@ User=junkyard
 Group=junkyard
 ```
 
+> Use `MemoryMax` instead of `MemoryLimit` — `MemoryLimit` is deprecated in newer systemd versions.
+
 ---
 
 ## Troubleshooting
 
-### Netstat doesn't exist as a command
-**1. Simply install the required package, net-tools**
-``` bash
-sudo apt-get install net-tools
-```
-
-### Logs Not Appearing in the Dashboard
-
-**1. Verify the syslog listener is active on S2-MT**
+**SYN_SENT instead of ESTABLISHED** — firewall rule missing. Check rules above and test with:
 ```bash
-sudo lsof -i :5514
-sudo journalctl -u junkyard -f
+nc -zv 192.168.20.1 5514
 ```
 
-**2. Check the TCP connection from a source VM**
+**pfSense logs not appearing** — verify UDP listener is active:
 ```bash
-# Run on the source VM (e.g., S1-APP)
-sudo netstat -tln | grep 5514
+ss -ulnp | grep 5514
 ```
-If no connection is shown, rsyslog on that VM may not have restarted after the config was applied.
 
-**3. Restart rsyslog on the source VM**
+**Logs show IP instead of hostname** — update the `hostMap` in `internal/ingestion/syslog.go`.
+
+**Service won't start:**
 ```bash
-sudo systemctl restart rsyslog
-sudo systemctl status rsyslog
+sudo journalctl -u junkyard.service -n 50 --no-pager
+sudo systemctl daemon-reload
 ```
 
-**4. Validate the rsyslog config syntax**
+**Database corrupted:**
 ```bash
-sudo rsyslogd -N1
+sudo systemctl stop junkyard.service
+sudo cp /var/lib/junkyard/logs.db /var/lib/junkyard/logs.db.bak
+sudo rm /var/lib/junkyard/logs.db
+sudo systemctl start junkyard.service
 ```
 
-**5. Send a test log manually**
+---
+
+## Alternative Installation Methods
+
+### Docker
 ```bash
-curl -X POST http://localhost:8080/api/ingest \
-  -H "Content-Type: application/json" \
-  -d '{"host":"test","message":"manual test log"}'
+docker build -t junkyard:latest .
+docker run -d \
+  -p 8080:8080 \
+  -p 5514:5514/tcp \
+  -p 5514:5514/udp \
+  -v junkyard-data:/data \
+  junkyard:latest
 ```
 
-### Service Won't Start
+### Manual (Ubuntu 24.04 LTS)
 
-**Check the systemd logs for the error:**
 ```bash
-sudo journalctl -u junkyard -n 50 --no-pager
-```
-
-**Common causes:**
-- Port 8080 or 5514 already in use — check with `sudo lsof -i :8080` and `sudo lsof -i :5514`
-- Database directory doesn't exist or has wrong ownership:
-  ```bash
-  sudo mkdir -p /var/lib/junkyard
-  sudo chown junkyard:junkyard /var/lib/junkyard
-  ```
-- Binary not found at `/usr/local/bin/junkyard-server` — verify with `which junkyard-server`
-
-### Database Errors
-
-**Check file permissions:**
-```bash
-ls -la /var/lib/junkyard/junkyard.db
-sudo chown junkyard:junkyard /var/lib/junkyard/junkyard.db
-```
-
-**Check integrity:**
-```bash
-sqlite3 /var/lib/junkyard/junkyard.db "PRAGMA integrity_check;"
-```
-
-**If the database is corrupted**, stop the service, back up the file, and delete it to start fresh:
-```bash
-sudo systemctl stop junkyard
-sudo cp /var/lib/junkyard/junkyard.db /var/lib/junkyard/junkyard.db.bak
-sudo rm /var/lib/junkyard/junkyard.db
-sudo systemctl start junkyard
-```
-
-### High Memory Usage
-
-- Check WAL files are being cleaned: `ls -la /var/lib/junkyard/`
-- Reduce the cache in `internal/storage/db.go`
-- Lower `--retention-days` to reduce table size
-
-### Slow Queries
-
-**Analyze the query plan:**
-```sql
-EXPLAIN QUERY PLAN SELECT * FROM logs WHERE host='s1-app' ORDER BY timestamp DESC LIMIT 100;
-```
-
-**Refresh index statistics:**
-```bash
-sqlite3 /var/lib/junkyard/junkyard.db "ANALYZE;"
-```
-
-**Check index info:**
-```bash
-sqlite3 /var/lib/junkyard/junkyard.db "SELECT * FROM pragma_index_list('logs');"
+sudo apt-get update && sudo apt-get install -y golang-1.21 git sqlite3
+make build-linux
+sudo useradd -r -s /bin/false junkyard
+sudo cp bin/junkyard-server /usr/local/bin/
+sudo mkdir -p /var/lib/junkyard && sudo chown junkyard:junkyard /var/lib/junkyard
+sudo cp systemd/junkyard.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable junkyard && sudo systemctl start junkyard
 ```
 
 ---
 
 ## Performance Benchmarks
 
-Tested on Ubuntu 24.04 LTS with 2GB RAM VM:
+Tested on Ubuntu 24.04 LTS, 2GB RAM VM:
 
 | Metric | Value |
 |--------|-------|
@@ -508,23 +396,23 @@ junkyard/
 │   ├── api/handlers.go      # REST API endpoints
 │   ├── ingestion/
 │   │   ├── http.go          # HTTP ingestion handler
-│   │   └── syslog.go        # Syslog server (RFC 3164)
+│   │   └── syslog.go        # Syslog server (RFC 3164, TCP+UDP)
 │   ├── storage/
 │   │   ├── db.go            # SQLite operations
 │   │   └── queries.go       # Query layer with filtering
-│   └── web/ui.go            # Web UI assets (HTML/CSS/JS)
+│   └── web/ui.go            # Web UI assets
 ├── pkg/models/log.go        # Shared data models
 ├── configs/
 │   └── junkyard-remote.conf # rsyslog forwarding template
 ├── systemd/junkyard.service # Systemd service unit
 ├── scripts/
 │   ├── deploy-s2-mt.sh      # Automated deployment script
-│   ├── build.sh             # Docker build script
+│   ├── build.sh             # Build script
 │   └── install.sh           # Ubuntu installation script
 ├── docs/
-│   ├── API.md               # Full API documentation
-│   ├── INSTALL.md           # Detailed installation guide
-│   └── USAGE.md             # Usage guide and examples
+│   ├── API.md
+│   ├── INSTALL.md
+│   └── USAGE.md
 ├── Makefile
 ├── Dockerfile
 ├── go.mod
@@ -534,45 +422,22 @@ junkyard/
 ### Running Tests
 
 ```bash
-make test                  # Run all tests
-go test -cover ./...       # With coverage
-make lint                  # Lint code
-make fmt                   # Format code
-```
-
-### Database Operations
-
-```bash
-# Query logs directly
-sqlite3 junkyard.db "SELECT COUNT(*) FROM logs;"
-
-# Export to CSV
-sqlite3 junkyard.db ".mode csv" "SELECT * FROM logs;" > export.csv
-
-# Analyze database size
-sqlite3 junkyard.db "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size();"
+make test
+go test -cover ./...
+make lint && make fmt
 ```
 
 ---
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/new-feature`
-3. Make your changes and test locally
-4. Commit with clear messages: `git commit -m "Add: feature description"`
-5. Push to your fork: `git push origin feature/new-feature`
-6. Open a Pull Request with description
 
 ## License
 
-MIT License — see LICENSE file for details.
+MIT — see LICENSE file.
 
 ## Support
 
-- 🐛 Issues: https://github.com/mr-andrej/junkyard/issues
-- 📖 Docs: https://github.com/mr-andrej/junkyard/wiki
+- Issues: https://github.com/mr-andrej/junkyard/issues
+- Docs: https://github.com/mr-andrej/junkyard/wiki
 
 ---
 
-**Made with hopes and prayers for the CIA academic project**
+*Made with hopes and prayers for the CIA academic project* 🗑️
