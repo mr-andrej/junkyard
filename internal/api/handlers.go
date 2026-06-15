@@ -44,6 +44,8 @@ func (api *APIServer) setupRoutes() {
 	// Statistics
 	api.router.HandleFunc("/api/stats", api.handleStats).Methods("GET")
 	api.router.HandleFunc("/api/timeseries", api.handleTimeSeries).Methods("GET")
+	api.router.HandleFunc("/api/timeseries/levels", api.handleTimeSeriesByLevel).Methods("GET")
+	api.router.HandleFunc("/api/errors-by-host", api.handleErrorsByHost).Methods("GET")
 }
 
 func (api *APIServer) Router() *mux.Router {
