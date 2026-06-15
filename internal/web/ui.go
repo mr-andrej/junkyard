@@ -14,6 +14,7 @@ const HTML = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🗑️ JUNKyard - Log Aggregator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -157,6 +158,37 @@ const HTML = `<!DOCTYPE html>
             color: #58a6ff;
         }
 
+        /* Charts */
+        .charts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .chart-card {
+            background: rgba(22, 27, 34, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 24px;
+            border-radius: 8px;
+            border: 1px solid rgba(48, 54, 61, 0.5);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .chart-title {
+            color: #58a6ff;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .chart-card canvas {
+            max-height: 220px;
+        }
+
+        /* Logs */
         .logs-container {
             background: rgba(13, 17, 23, 0.8);
             border: 1px solid rgba(48, 54, 61, 0.5);
@@ -227,61 +259,6 @@ const HTML = `<!DOCTYPE html>
             to { transform: rotate(360deg); }
         }
 
-        .stats-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-
-        .chart-card {
-            background: rgba(22, 27, 34, 0.8);
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid rgba(48, 54, 61, 0.5);
-        }
-
-        .chart-title {
-            color: #58a6ff;
-            font-weight: bold;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-
-        .bar-chart {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .bar-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .bar-label {
-            min-width: 100px;
-            color: #8b949e;
-            font-size: 12px;
-        }
-
-        .bar {
-            flex: 1;
-            height: 20px;
-            background: linear-gradient(90deg, #58a6ff, #79c0ff);
-            border-radius: 3px;
-            opacity: 0.7;
-        }
-
-        .bar-value {
-            min-width: 60px;
-            text-align: right;
-            color: #c9d1d9;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -301,6 +278,17 @@ const HTML = `<!DOCTYPE html>
             <p class="tagline">"Throw all your logs into the junkyard."</p>
             <div class="stats-grid" id="statsGrid"></div>
         </header>
+
+        <div class="charts-section">
+            <div class="chart-card">
+                <div class="chart-title">📊 Logs by Severity</div>
+                <canvas id="chartByLevel"></canvas>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">🖥️ Top Hosts by Volume</div>
+                <canvas id="chartByHost"></canvas>
+            </div>
+        </div>
 
         <div class="controls">
             <input type="text" id="searchInput" placeholder="🔍 Search logs..." style="flex: 1; min-width: 200px;">
@@ -332,6 +320,8 @@ const HTML = `<!DOCTYPE html>
 
     <script>
         let autoRefreshInterval = null;
+        let chartByLevel = null;
+        let chartByHost = null;
         const API_BASE = window.location.protocol + '//' + window.location.host;
 
         async function loadStats() {
@@ -352,8 +342,76 @@ const HTML = `<!DOCTYPE html>
                 html += '<div class="stat-card"><div class="stat-value">' + ((stats.last_24h || 0).toLocaleString()) + '</div><div class="stat-label">Last 24h</div></div>';
 
                 document.getElementById('statsGrid').innerHTML = html;
+
+                updateCharts(stats);
             } catch (e) {
                 console.error('Failed to load stats:', e);
+            }
+        }
+
+        function updateCharts(stats) {
+            // --- Logs by Severity (doughnut) --- maps stats.by_level from GetStats()
+            const byLevel = stats.by_level || {};
+            const levelLabels = ['error', 'warning', 'info', 'debug'];
+            const levelData = levelLabels.map(l => byLevel[l] || 0);
+            const levelColors = ['#f85149', '#d29922', '#58a6ff', '#8b949e'];
+
+            if (chartByLevel) {
+                chartByLevel.data.datasets[0].data = levelData;
+                chartByLevel.update();
+            } else {
+                chartByLevel = new Chart(document.getElementById('chartByLevel'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: levelLabels.map(l => l.charAt(0).toUpperCase() + l.slice(1)),
+                        datasets: [{
+                            data: levelData,
+                            backgroundColor: levelColors.map(c => c + '33'),
+                            borderColor: levelColors,
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { labels: { color: '#8b949e', font: { family: 'Consolas, monospace', size: 12 } } }
+                        }
+                    }
+                });
+            }
+
+            // --- Top Hosts by Volume (bar) --- maps stats.by_host from GetStats() (top 10)
+            const byHost = stats.by_host || {};
+            const hostLabels = Object.keys(byHost).sort((a, b) => byHost[b] - byHost[a]);
+            const hostData = hostLabels.map(h => byHost[h]);
+
+            if (chartByHost) {
+                chartByHost.data.labels = hostLabels;
+                chartByHost.data.datasets[0].data = hostData;
+                chartByHost.update();
+            } else {
+                chartByHost = new Chart(document.getElementById('chartByHost'), {
+                    type: 'bar',
+                    data: {
+                        labels: hostLabels,
+                        datasets: [{
+                            label: 'Log entries',
+                            data: hostData,
+                            backgroundColor: 'rgba(88, 166, 255, 0.2)',
+                            borderColor: '#58a6ff',
+                            borderWidth: 2,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { ticks: { color: '#8b949e' }, grid: { color: 'rgba(48,54,61,0.4)' } },
+                            y: { ticks: { color: '#8b949e' }, grid: { color: 'rgba(48,54,61,0.4)' }, beginAtZero: true }
+                        }
+                    }
+                });
             }
         }
 
