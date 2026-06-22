@@ -169,6 +169,34 @@ const HTML = `<!DOCTYPE html>
         button.secondary:hover { background: rgba(48, 54, 61, 0.5); border-color: #58a6ff; color: #58a6ff; }
         button.secondary.active { background: rgba(88, 166, 255, 0.1); border-color: #58a6ff; color: #58a6ff; }
 
+        /* Quick queries bar */
+        .quick-queries {
+            background: rgba(22, 27, 34, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 14px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(48, 54, 61, 0.5);
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .quick-label { color: #8b949e; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-right: 4px; }
+        .quick-btn {
+            background: transparent;
+            border: 1px solid rgba(48, 54, 61, 0.8);
+            color: #8b949e;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .quick-btn:hover { border-color: #a371f7; color: #a371f7; background: rgba(163, 113, 247, 0.08); }
+        .quick-btn .desc { display: block; font-size: 10px; color: #6e7681; margin-top: 2px; }
+
         /* Logs */
         .logs-container {
             background: rgba(13, 17, 23, 0.8);
@@ -271,6 +299,22 @@ const HTML = `<!DOCTYPE html>
                 <div class="chart-title">🖥️ Top Hosts by Volume</div>
                 <div class="chart-body"><canvas id="chartByHost"></canvas></div>
             </div>
+        </div>
+
+        <div class="quick-queries">
+            <span class="quick-label">Quick queries:</span>
+            <button class="quick-btn" onclick="runQuickQuery('Accepted publickey')">
+                SSH Logins
+                <span class="desc">Successful SSH authentications</span>
+            </button>
+            <button class="quick-btn" onclick="runQuickQuery('Read error from remote host')">
+                SSH Logouts
+                <span class="desc">SSH sessions ended/disconnected</span>
+            </button>
+            <button class="quick-btn" onclick="runQuickQuery('Failed')">
+                Failed Auth
+                <span class="desc">Failed login attempts</span>
+            </button>
         </div>
 
         <div class="controls">
@@ -526,6 +570,14 @@ const HTML = `<!DOCTYPE html>
                 container.innerHTML = '<div class="empty-state"><div class="empty-icon">Error</div></div>';
                 console.error('logs failed:', e);
             }
+        }
+
+        function runQuickQuery(query) {
+            document.getElementById('searchInput').value = query;
+            document.getElementById('hostFilter').value = '';
+            document.getElementById('levelFilter').value = '';
+            document.getElementById('sourceFilter').value = '';
+            loadLogs();
         }
 
         function toggleAutoRefresh() {
