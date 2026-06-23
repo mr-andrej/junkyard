@@ -307,7 +307,7 @@ const HTML = `<!DOCTYPE html>
                 SSH Logins
                 <span class="desc">Successful SSH authentications</span>
             </button>
-            <button class="quick-btn" onclick="runQuickQuery('Read error from remote host')">
+            <button class="quick-btn" onclick="runQuickQuery('Disconnected from user')">
                 SSH Logouts
                 <span class="desc">SSH sessions ended/disconnected</span>
             </button>
