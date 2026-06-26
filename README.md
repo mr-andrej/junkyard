@@ -4,7 +4,7 @@
 
 JUNKyard is a lightweight, Go-based log aggregation system designed for centralized log collection across multiple VMs in a CIA academic project environment. It provides a web UI, powerful query capabilities, and full-text search across logs from distributed sources.
 
-![JUNKyard Dashboard](https://i.imgur.com/pzfycnd.png)
+![JUNKyard Dashboard](https://i.imgur.com/mkjIxgZ.png)
 
 ## Features
 
