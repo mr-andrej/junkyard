@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Junkyard Field Guide · Andrej Ilievski</title>
+<meta name="description" content="A running glossary of every term and tool mentioned on this blog: OTLP, TSDBs, WALs, Kubernetes, and friends. Explained for readers who know nothing, by an author who recently knew nothing.">
+<meta name="author" content="Andrej Ilievski">
+<link rel="canonical" href="https://blog.mrandrej.com/field-guide.html">
+<meta property="og:title" content="The Junkyard Field Guide">
+<meta property="og:description" content="Every term and tool mentioned on this blog, explained for readers who know nothing, by an author who recently knew nothing.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://blog.mrandrej.com/field-guide.html">
+<meta name="theme-color" content="#181D28">
+<script>
+(function(){
+  var t = null;
+  try{ t = localStorage.getItem("theme"); }catch(e){}
+  if(t !== "dark" && t !== "light"){
+    t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  }
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23181D28'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='monospace' font-size='15' font-weight='700' fill='%23AEB9E0'%3EAI%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/blog.css">
+</head>
+<body>
+
+<header>
+  <div class="hwrap">
+    <a class="wordmark" href="index.html">A.ILIEVSKI<span class="slash">/</span>BLOG</a>
+    <nav aria-label="Navigation">
+      <a href="index.html">Writing</a>
+      <a href="field-guide.html" aria-current="page">Field Guide</a>
+      <a href="https://github.com/mr-andrej/junkyard" target="_blank" rel="noopener">Junkyard</a>
+      <a href="https://mrandrej.com/" target="_blank" rel="noopener">Portfolio</a>
+    </nav>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" onclick="toggleTheme()">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+<article>
+
+  <div class="post-head">
+    <p class="meta"><span class="series">REFERENCE</span><span>updated 2026-07-20</span></p>
+    <h1>The Junkyard Field Guide</h1>
+    <p class="standfirst">Every term and tool I throw around in these posts, explained for readers who know nothing, written by an author who until recently also knew nothing. Updated whenever the project forces me to learn a new word.</p>
+  </div>
+
+  <div class="gloss">
+
+    <h3>Signals &amp; protocols</h3>
+    <dl>
+      <dt>OpenTelemetry (OTel)</dt>
+      <dd>The industry-standard framework for producing telemetry (logs, metrics, traces) from your code. Vendor-neutral, so instrumenting once means you can send data anywhere. Including to a junkyard.</dd>
+
+      <dt>OTLP</dt>
+      <dd>The OpenTelemetry Protocol: the wire format telemetry travels in. Speaks gRPC on port 4317 and HTTP on 4318. If Junkyard v2 speaks one language fluently, it's this one.</dd>
+
+      <dt>gRPC</dt>
+      <dd>A remote procedure call framework built on HTTP/2 and Protocol Buffers. Fast, typed, and the reason Go services can talk to each other without anyone writing JSON parsing code at 2am.</dd>
+
+      <dt>Log</dt>
+      <dd>A timestamped record of something that happened. The humblest signal, and the one that ate a 2GB VM's disk and my dignity along with it.</dd>
+
+      <dt>Metric</dt>
+      <dd>A numeric measurement over time, identified by a name plus labels (e.g. <code>http_requests_total{status="500"}</code>). Small data, enormous volume.</dd>
+
+      <dt>Trace / span</dt>
+      <dd>A trace follows one request through every service it touches. Each unit of work inside it is a span. Spans share a <code>trace_id</code>, which is how you reassemble the story afterwards.</dd>
+
+      <dt>Cardinality</dt>
+      <dd>How many unique combinations of metric name + labels exist. The silent killer of metrics systems: one <code>user_id</code> label and your "small" TSDB is suddenly keeping a series per user. We will not be doing that. Probably.</dd>
+    </dl>
+
+    <h3>Storage</h3>
+    <dl>
+      <dt>TSDB</dt>
+      <dd>Time-series database: a store specialized for (timestamp, value) pairs. Junkyard ships its own small one, partly for learning, mostly so I can say I did.</dd>
+
+      <dt>Head block</dt>
+      <dd>The in-memory part of a TSDB where fresh writes land before being flushed to disk. Fast to write, fast to query, gone if you crash, which is why it has a bodyguard (see WAL).</dd>
+
+      <dt>WAL (write-ahead log)</dt>
+      <dd>An append-only file every write hits <em>before</em> the fancy data structures. After a crash you replay it and pretend nothing happened. Not to be confused with SQLite's WAL mode, which is the same idea wearing a different hat.</dd>
+
+      <dt>Segment files</dt>
+      <dd>Immutable chunks of flushed data on disk. Immutable means "never modified, only created and deleted," which makes retention a matter of deleting old folders. My favorite kind of feature: the kind rm -rf can implement.</dd>
+
+      <dt>Downsampling / rollup</dt>
+      <dd>Throwing away resolution over time: keep every data point for a week, 1-minute averages for a month, 1-hour averages for a year. Nobody needs per-second CPU data from March.</dd>
+
+      <dt>Retention</dt>
+      <dd>How long data is allowed to live before deletion. In v1, retention was "until the disk is full and the VM dies." v2 aims slightly higher.</dd>
+
+      <dt>SQLite</dt>
+      <dd>An entire SQL database in a single file, embedded in the process. Unfairly dismissed as a toy; it powers a shocking amount of the world's software and both of Junkyard's versions.</dd>
+
+      <dt>FTS5</dt>
+      <dd>SQLite's full-text search extension. Turns "find logs containing this word" from a table scan into an index lookup.</dd>
+    </dl>
+
+    <h3>Infrastructure</h3>
+    <dl>
+      <dt>Kubernetes (k8s)</dt>
+      <dd>A container orchestrator: you declare what should run, it keeps it running. The de facto standard for deploying serious systems, and the thing my M.Sc. keeps making me draw diagrams of.</dd>
+
+      <dt>kind</dt>
+      <dd>Kubernetes IN Docker: a whole cluster running in Docker containers on your laptop. How you test k8s deployments without paying a cloud provider for the privilege.</dd>
+
+      <dt>Helm</dt>
+      <dd>The package manager for Kubernetes. A Helm chart is a templated bundle of everything an app needs to run, so <code>helm install junkyard</code> just works. That's the goal, anyway.</dd>
+
+      <dt>CI (continuous integration)</dt>
+      <dd>Robots that run your tests and builds on every push. v1 had none and it showed. v2 has them from day one and it will also show, but positively.</dd>
+    </dl>
+
+    <h3>Concepts</h3>
+    <dl>
+      <dt>Backpressure</dt>
+      <dd>Telling an over-eager client to slow down instead of falling over silently. In Junkyard: a full queue returns "come back later" (<code>503</code> / <code>RESOURCE_EXHAUSTED</code>) rather than eating memory until the process dies.</dd>
+
+      <dt>Monolith</dt>
+      <dd>One binary that does everything. Usually said as an insult. Here it's a deliberate choice: the interesting problems live inside the process, and one binary is hard to misconfigure.</dd>
+
+      <dt>Dogfooding</dt>
+      <dd>Using your own product. Junkyard's twist: Datadog's free tier monitors Junkyard, meaning the real product watches my tribute act.</dd>
+
+      <dt>ClickHouse / VictoriaMetrics / Elasticsearch</dt>
+      <dd>Excellent, battle-tested storage engines I am deliberately not using, because they would hide everything I'm trying to learn. This is a feature of the project, not an oversight. I keep telling myself that.</dd>
+    </dl>
+
+  </div>
+
+  <div class="post-nav">
+    <a href="index.html">← All posts</a>
+    <a href="https://github.com/mr-andrej/junkyard" target="_blank" rel="noopener">github.com/mr-andrej/junkyard →</a>
+  </div>
+
+</article>
+</main>
+
+<footer>
+  <div class="fwrap">
+    <span>© 2026 Andrej Ilievski · Paris</span>
+    <span class="spacer"></span>
+    <a href="feed.xml">RSS</a>
+    <a href="https://github.com/mr-andrej" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://linkedin.com/in/mr-andrej" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://mrandrej.com/" target="_blank" rel="noopener">mrandrej.com</a>
+  </div>
+</footer>
+
+<script>
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  try{ localStorage.setItem("theme", next); }catch(e){}
+}
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
+  let saved = null;
+  try{ saved = localStorage.getItem("theme"); }catch(err){}
+  if(!saved){
+    document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+  }
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Building in Public · Andrej Ilievski</title>
+    <link>https://blog.mrandrej.com/</link>
+    <description>Engineering notes: rebuilding a personal observability platform (OTLP, a custom TSDB, Kubernetes) from scratch, in Go, in public.</description>
+    <language>en-us</language>
+    <lastBuildDate>Mon, 20 Jul 2026 18:00:00 +0200</lastBuildDate>
+    <atom:link href="https://blog.mrandrej.com/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Rebuilding Junkyard: a mini-Datadog from scratch</title>
+      <link>https://blog.mrandrej.com/posts/2026-07-20-rebuilding-junkyard-v2.html</link>
+      <guid isPermaLink="true">https://blog.mrandrej.com/posts/2026-07-20-rebuilding-junkyard-v2.html</guid>
+      <pubDate>Mon, 20 Jul 2026 18:00:00 +0200</pubDate>
+      <description>Why I'm throwing away a working log aggregator and rebuilding it as an OTLP-native observability platform: the architecture, the trade-offs, and the 12-week plan.</description>
+    </item>
+  </channel>
+</rss>

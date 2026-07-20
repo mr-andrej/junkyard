@@ -1,0 +1,923 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      Rebuilding Junkyard: a mini-Datadog from scratch · Andrej Ilievski
+    </title>
+    <meta
+      name="description"
+      content="Why I'm throwing away a working log aggregator and rebuilding it as an OTLP-native observability platform: the architecture, the trade-offs, and the 12-week plan."
+    />
+    <meta name="author" content="Andrej Ilievski" />
+    <link
+      rel="canonical"
+      href="https://blog.mrandrej.com/posts/2026-07-20-rebuilding-junkyard-v2.html"
+    />
+    <meta
+      property="og:title"
+      content="Rebuilding Junkyard: a mini-Datadog from scratch"
+    />
+    <meta
+      property="og:description"
+      content="Why I'm throwing away a working log aggregator and rebuilding it as an OTLP-native observability platform."
+    />
+    <meta property="og:type" content="article" />
+    <meta
+      property="og:url"
+      content="https://blog.mrandrej.com/posts/2026-07-20-rebuilding-junkyard-v2.html"
+    />
+    <meta
+      property="og:image"
+      content="https://blog.mrandrej.com/og-image.jpg"
+    />
+    <meta property="article:published_time" content="2026-07-20" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#181D28" />
+    <script>
+      (function () {
+        var t = null;
+        try {
+          t = localStorage.getItem("theme");
+        } catch (e) {}
+        if (t !== "dark" && t !== "light") {
+          t =
+            window.matchMedia &&
+            matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+      })();
+    </script>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23181D28'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='monospace' font-size='15' font-weight='700' fill='%23AEB9E0'%3EAI%3C/text%3E%3C/svg%3E"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="../favicon-32x32.png"
+    />
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Spline+Sans+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../assets/blog.css" />
+  </head>
+  <body>
+    <header>
+      <div class="hwrap">
+        <a class="wordmark" href="../index.html"
+          >A.ILIEVSKI<span class="slash">/</span>BLOG</a
+        >
+        <nav aria-label="Navigation">
+          <a href="../index.html">Writing</a>
+          <a href="../field-guide.html">Field Guide</a>
+          <a
+            href="https://github.com/mr-andrej/junkyard"
+            target="_blank"
+            rel="noopener"
+            >Junkyard</a
+          >
+          <a href="https://mrandrej.com/" target="_blank" rel="noopener"
+            >Portfolio</a
+          >
+        </nav>
+        <button
+          class="theme-toggle"
+          id="theme-toggle"
+          aria-label="Toggle theme"
+          onclick="toggleTheme()"
+        >
+          <svg
+            class="icon-moon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+          <svg
+            class="icon-sun"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="4" />
+            <path
+              d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+            />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <article>
+        <div class="post-head">
+          <p class="meta">
+            <span class="series">JUNKYARD V2 · #1</span><span>2026-07-20</span
+            ><span>~8 min read</span>
+          </p>
+          <h1>Rebuilding Junkyard: a mini-Datadog from scratch</h1>
+          <p class="standfirst">
+            I have a "working" log aggregator, a self-imposed conference
+            deadline, and a job interview to prepare for. This is why I'm
+            scrapping the first one and rebuilding the architecture into
+            something better. Junkyard v1 was meant to be DIY solution
+            duct-taped together in a panic to satisfy a need for a project for
+            Epitech where we were given pitiful VMs with 2GB of RAM that could
+            barely keep themselves turned on.
+          </p>
+        </div>
+
+        <h2>The deadline</h2>
+        <p>
+          On <strong>October 15, 2026</strong>, there's a Datadog Summit in
+          Paris. I registered, and I asked to chat with a Datadog engineer,
+          mentioning, perhaps optimistically, my Go observability project. When
+          my M.Sc. at Epitech finishes in 2027, I want to land a junior Software
+          Engineer role there.
+        </p>
+        <p>
+          The funny thing being that this isn't my first attempt at this. When I
+          finished my first Master's (BAC +5) in software architecture through
+          OpenClassrooms I also applied perhaps 5 times to Datadog for a CDI. I
+          got <strong>0</strong> interviews out of that, cue the tiny violin
+          music and dim the lights.
+        </p>
+        <p>
+          Datadog's interviews are not framework trivia, whatever that means
+          exactly. Similarly to some FAANG companies, they most likely probe
+          systems thinking: concurrency, backpressure, distributed-systems
+          trade-offs, production-ready code. So the project can't just
+          <em>exist</em> by October. It has to be the kind of thing you can
+          defend line by line in a design discussion. Twelve weeks out, my
+          current project is not that thing.
+        </p>
+        <p>
+          If you're a Datadog SWE and you're reading this, hello there stranger.
+          If you aren't and you're reading this, please forward it to anyone you
+          know at Datadog. I will be bound to you by honor for at least 3 years,
+          I pinkie promise!
+        </p>
+
+        <h2>What Junkyard v1 actually is</h2>
+        <p>
+          Junkyard v1 is a lightweight log aggregator I built in Go: HTTP and
+          syslog ingestion, a SQLite store (WAL mode, FTS5 full-text search), a
+          query API, a web UI, and a CLI. It genuinely worked. It collected
+          logs from multiple VMs into one searchable place. Though the
+          networking changes I had to do to get to there were an absolute
+          nightmare.
+        </p>
+        <p>Safe to say it was rushed. Here is a fun little list:</p>
+        <ul>
+          <li>
+            <strong>Logs only.</strong> No metrics, no traces, no OpenTelemetry
+            anywhere, and OTLP is table stakes for anything calling itself
+            observability tooling in 2026. Sadly I didn't know what that even
+            was when I was writing Junkyard v1.
+          </li>
+          <li>
+            <strong>No tests, no CI.</strong> Nothing more to say about that,
+            which is itself the problem. Let's say
+            <strong>speed of delivery</strong> was just too important!
+          </li>
+          <li>
+            <strong>Not easily reproducible.</strong> Deployment is a bit of a
+            nightmare. While my documentation detailed the intended steps, often
+            I ran into problems on the network/infra side that required some
+            real research to overcome. In theory, if your network is set up well
+            enough it shouldn't be too complicated. Is it worth it for the
+            functionality offered? Yeah, no. Not really.
+          </li>
+          <li>
+            My personal favorite: when things weren't working properly I would
+            SSH into the monitoring VM and try to make fixes in Vim to save time
+            by skipping going through Github.
+            <code>That Vim session is open to this day.</code>
+          </li>
+        </ul>
+        <img
+          class="post-img"
+          src="assets/vim-meme.png"
+          alt="Google search on how to exit Vim, with a simple answer of No"
+          width="818"
+          height="425"
+        />
+        <p>
+          The foundation is good, the SQLite log store design carries over,
+          but v1 demonstrates "I can build a <strong>thing</strong> for logs,"
+          not "I can reason about an ingestion pipeline under load." Though I
+          would like to say that due to some bad setup on our part, we were
+          indeed getting about 15,000 logs per day at some point. My
+          <strong>thing</strong> of an app only crapped out and died when the
+          logs ate up all the remaining storage space on the VM. So the plan for
+          now: rebuild, in "public", with a decision log. The v1 code stays in
+          git history under a <code>v1.0.0</code> tag. The rebuild from scratch
+          is part of the story, not something to hide.
+        </p>
+
+        <h2>The target: a mini-Datadog</h2>
+        <p>
+          I understand how it reads, like I haven't been sleeping enough for a
+          month and now I'm rambling. But Junkyard v2 is/will be/should be a
+          personal observability platform, scoped to what one person can build
+          well in twelve weeks:
+        </p>
+        <ul>
+          <li>
+            <strong>OTLP ingestion</strong> for all three signals (metrics,
+            logs, and traces) over gRPC and HTTP.
+          </li>
+          <li>
+            A
+            <strong
+              >storage layer with a deliberate retention and downsampling
+              story</strong
+            >, including a small custom time-series database. The point isn't to
+            beat VictoriaMetrics, I don't have 8 years of time to produce an 8th
+            of the functionality. The point is to be able to explain every
+            trade-off I made, and ideally not suck too badly at Go.
+          </li>
+          <li>
+            A <strong>query API and web UI</strong>: log search, trace
+            waterfalls, metric charts.
+          </li>
+          <li>
+            <strong
+              >Containerized, deployed on Kubernetes via a Helm chart</strong
+            >.
+            <code>helm install</code> works on <code>kind</code> from a clean
+            clone.
+          </li>
+          <li>
+            An <strong>instrumented demo app</strong> generating realistic
+            telemetry. I will probably host it under junkyard.mrandrej.com,
+            we'll see!
+          </li>
+          <li>
+            <strong>Datadog's free tier monitoring Junkyard itself</strong>:
+            dogfooding, and a good conversation starter at the Summit.
+          </li>
+        </ul>
+
+        <h2>The architecture</h2>
+
+        <figure>
+          <svg
+            viewBox="0 0 760 600"
+            role="img"
+            aria-label="Junkyard v2 architecture diagram: a demo app sends OTLP telemetry to the junkyard-server, which processes it through receivers, an ingest pipeline, and three storage engines, served by a query API, and Datadog's free tier scrapes the server's self-instrumentation metrics."
+          >
+            <defs>
+              <marker
+                id="arrowhead"
+                markerWidth="8"
+                markerHeight="8"
+                refX="7"
+                refY="3"
+                orient="auto"
+              >
+                <path d="M0,0 L7,3 L0,6 Z" class="d-marker-fill" />
+              </marker>
+            </defs>
+
+            <!-- demo app -->
+            <rect
+              x="24"
+              y="250"
+              width="150"
+              height="86"
+              rx="8"
+              class="d-box-accent"
+            />
+            <text
+              x="99"
+              y="284"
+              text-anchor="middle"
+              font-size="13"
+              font-weight="600"
+              class="d-label"
+            >
+              demo app
+            </text>
+            <text
+              x="99"
+              y="304"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              Go · OTel SDK
+            </text>
+
+            <!-- OTLP arrow -->
+            <line x1="174" y1="293" x2="214" y2="293" class="d-arrow" />
+            <text
+              x="194"
+              y="278"
+              text-anchor="middle"
+              font-size="10.5"
+              font-weight="600"
+              class="d-accent"
+            >
+              OTLP
+            </text>
+
+            <!-- server container -->
+            <rect
+              x="220"
+              y="24"
+              width="516"
+              height="450"
+              rx="10"
+              class="d-container"
+            />
+            <text
+              x="238"
+              y="50"
+              font-size="11.5"
+              font-weight="600"
+              letter-spacing="2"
+              class="d-accent"
+            >
+              JUNKYARD-SERVER
+            </text>
+
+            <!-- receivers -->
+            <rect
+              x="252"
+              y="66"
+              width="452"
+              height="62"
+              rx="8"
+              class="d-box-accent"
+            />
+            <text
+              x="478"
+              y="92"
+              text-anchor="middle"
+              font-size="13"
+              font-weight="600"
+              class="d-label"
+            >
+              OTLP receivers
+            </text>
+            <text
+              x="478"
+              y="112"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              Logs · Metrics · Traces · gRPC :4317 / HTTP :4318
+            </text>
+
+            <line x1="478" y1="128" x2="478" y2="154" class="d-arrow" />
+
+            <!-- pipeline -->
+            <rect
+              x="252"
+              y="156"
+              width="452"
+              height="78"
+              rx="8"
+              class="d-box"
+            />
+            <text
+              x="478"
+              y="180"
+              text-anchor="middle"
+              font-size="13"
+              font-weight="600"
+              class="d-label"
+            >
+              ingest pipeline
+            </text>
+            <text
+              x="478"
+              y="199"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              validate → bounded queue → batch → single writer
+            </text>
+            <text
+              x="478"
+              y="217"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              backpressure: 503 / RESOURCE_EXHAUSTED
+            </text>
+
+            <!-- fan-out bus -->
+            <line
+              x1="478"
+              y1="234"
+              x2="478"
+              y2="248"
+              class="d-arrow"
+              style="marker-end: none"
+            />
+            <line
+              x1="322"
+              y1="248"
+              x2="638"
+              y2="248"
+              class="d-arrow"
+              style="marker-end: none"
+            />
+            <line x1="322" y1="248" x2="322" y2="258" class="d-arrow" />
+            <line x1="480" y1="248" x2="480" y2="258" class="d-arrow" />
+            <line x1="638" y1="248" x2="638" y2="258" class="d-arrow" />
+
+            <!-- storage boxes -->
+            <rect
+              x="252"
+              y="260"
+              width="140"
+              height="96"
+              rx="8"
+              class="d-box"
+            />
+            <text
+              x="322"
+              y="288"
+              text-anchor="middle"
+              font-size="12.5"
+              font-weight="600"
+              class="d-label"
+            >
+              metrics
+            </text>
+            <text
+              x="322"
+              y="307"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              custom TSDB
+            </text>
+            <text
+              x="322"
+              y="323"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              head + WAL
+            </text>
+            <text
+              x="322"
+              y="339"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              segments + rollups
+            </text>
+
+            <rect
+              x="410"
+              y="260"
+              width="140"
+              height="96"
+              rx="8"
+              class="d-box"
+            />
+            <text
+              x="480"
+              y="288"
+              text-anchor="middle"
+              font-size="12.5"
+              font-weight="600"
+              class="d-label"
+            >
+              logs
+            </text>
+            <text
+              x="480"
+              y="307"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              SQLite
+            </text>
+            <text
+              x="480"
+              y="323"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              FTS5 search
+            </text>
+
+            <rect
+              x="568"
+              y="260"
+              width="140"
+              height="96"
+              rx="8"
+              class="d-box"
+            />
+            <text
+              x="638"
+              y="288"
+              text-anchor="middle"
+              font-size="12.5"
+              font-weight="600"
+              class="d-label"
+            >
+              traces
+            </text>
+            <text
+              x="638"
+              y="307"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              SQLite
+            </text>
+            <text
+              x="638"
+              y="323"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              lookup by trace_id
+            </text>
+
+            <!-- fan-in bus -->
+            <line
+              x1="322"
+              y1="356"
+              x2="322"
+              y2="368"
+              class="d-arrow"
+              style="marker-end: none"
+            />
+            <line
+              x1="480"
+              y1="356"
+              x2="480"
+              y2="368"
+              class="d-arrow"
+              style="marker-end: none"
+            />
+            <line
+              x1="638"
+              y1="356"
+              x2="638"
+              y2="368"
+              class="d-arrow"
+              style="marker-end: none"
+            />
+            <line
+              x1="322"
+              y1="368"
+              x2="638"
+              y2="368"
+              class="d-arrow"
+              style="marker-end: none"
+            />
+            <line x1="480" y1="368" x2="480" y2="386" class="d-arrow" />
+
+            <!-- query -->
+            <rect
+              x="252"
+              y="388"
+              width="452"
+              height="62"
+              rx="8"
+              class="d-box-accent"
+            />
+            <text
+              x="478"
+              y="414"
+              text-anchor="middle"
+              font-size="13"
+              font-weight="600"
+              class="d-label"
+            >
+              query API + web UI
+            </text>
+            <text
+              x="478"
+              y="434"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              /api/v1/{logs,traces,metrics} · /metrics self-instrumentation
+            </text>
+
+            <!-- datadog -->
+            <line x1="362" y1="474" x2="362" y2="514" class="d-arrow-dashed" />
+            <text x="374" y="498" font-size="10.5" class="d-sub">/metrics</text>
+            <rect
+              x="252"
+              y="516"
+              width="220"
+              height="62"
+              rx="8"
+              class="d-box"
+            />
+            <text
+              x="362"
+              y="542"
+              text-anchor="middle"
+              font-size="12.5"
+              font-weight="600"
+              class="d-label"
+            >
+              Datadog free tier
+            </text>
+            <text
+              x="362"
+              y="561"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-amber"
+            >
+              dogfooding
+            </text>
+
+            <!-- user -->
+            <line x1="612" y1="474" x2="612" y2="514" class="d-arrow" />
+            <rect
+              x="520"
+              y="516"
+              width="184"
+              height="62"
+              rx="8"
+              class="d-box"
+            />
+            <text
+              x="612"
+              y="542"
+              text-anchor="middle"
+              font-size="12.5"
+              font-weight="600"
+              class="d-label"
+            >
+              you
+            </text>
+            <text
+              x="612"
+              y="561"
+              text-anchor="middle"
+              font-size="10.5"
+              class="d-sub"
+            >
+              browser · curl
+            </text>
+          </svg>
+          <figcaption>
+            fig. 1: one monolith binary, three signals, three storage engines.
+            The diagram is hand-written inline SVG. It follows the site's
+            light/dark theme.
+          </figcaption>
+        </figure>
+
+        <p>
+          Two things to notice. First, it's a <strong>monolith</strong>: one
+          binary runs receivers, pipeline, storage, and query API. Splitting
+          this into microservices would add deployment complexity with zero
+          learning benefit at this scale, is what I should say. The truth is I
+          don't feel like frying my brain any more than required. The
+          interesting concurrency lives inside the process, not between
+          processes. Second, there are
+          <strong>three different storage answers</strong> for the three
+          signals. That's deliberate, for now. As I have very little clue what
+          I'm doing I reserve the right to retcon anything I say and pretend it
+          never happened.
+        </p>
+
+        <h2>The ingestion pipeline</h2>
+        <p>Every request travels the same path:</p>
+        <pre><code>receiver → normalize → [bounded channel] → batcher → single storage writer</code></pre>
+        <p>
+          The queue is a fixed-capacity Go channel per signal type, and that's
+          the entire queue. When it's full, the receiver doesn't block: it tells
+          the client to back off (<code>RESOURCE_EXHAUSTED</code> on gRPC,
+          <code>503</code> + <code>Retry-After</code> on HTTP, per the OTLP
+          spec) and increments a dropped-batch metric. A slow disk can never
+          stall every connected client.
+        </p>
+        <p>
+          The batcher accumulates points until a size or time threshold, then
+          hands one batch to a
+          <strong>single writer goroutine per signal type</strong>. That
+          serializes all writes, which turns SQLite's single-writer limitation
+          from a problem you fight into a property you design around.
+        </p>
+        <div class="callout">
+          <span class="label">Trade-off, stated out loud</span>
+          <p>
+            The queue is in-memory, so a crash loses whatever hasn't been
+            flushed: seconds of data. A durable, Kafka-style ingest queue would
+            close that window and is explicitly out of scope. For a demo
+            platform, bounded memory and simple reasoning beat durability
+            guarantees I don't need.
+          </p>
+        </div>
+
+        <h2>Storage: three signals, three answers</h2>
+        <p>
+          <strong>Metrics get a custom TSDB</strong>: the centerpiece, and the
+          part most likely to teach me humility. An
+          in-memory head block (series ID → append-only samples) behind a
+          write-ahead log, flushed periodically into immutable segment files,
+          with a background job downsampling raw data into 1-minute and 1-hour
+          rollups:
+        </p>
+        <pre><code>data/
+├── wal/            # replayed on startup
+├── head/           # in-memory, recent window
+└── segments/       # immutable flushed blocks
+    └── rollup/     # 1m → 1h downsampling</code></pre>
+        <p>
+          Retention becomes trivial: raw data lives 7 days, 1-minute rollups 30
+          days, 1-hour rollups a year, and "expiring data" is just deleting old
+          segment directories. That property alone justifies immutable segments.
+        </p>
+        <p>
+          <strong>Logs and traces stay on SQLite.</strong> The v1 log store
+          already proved itself (WAL mode, FTS5). It gains
+          <code>trace_id</code>/<code>span_id</code> columns so logs and traces
+          can reference each other. Traces get a span-oriented schema where
+          fetching a whole trace is one indexed lookup.
+        </p>
+        <div class="callout amber">
+          <span class="label"
+            >Why not ClickHouse / VictoriaMetrics / Elasticsearch?</span
+          >
+          <p>
+            Because they hide exactly what I'm trying to learn. A
+            general-purpose TSDB for all three signals is a multi-month project,
+            but metrics alone are the right target: uniform data model,
+            append-heavy workload, and a rich downsampling story. Every
+            simplification gets a paragraph in the repo's decision log. The
+            naivety is deliberate and documented, which is what makes it
+            defensible in an interview rather than merely naive. In theory.
+          </p>
+        </div>
+
+        <h2>The plan</h2>
+        <p>
+          Twelve weeks, five milestones, committed early and often: a visible
+          three-month commit history is worth more than a polished weekend dump:
+        </p>
+        <table>
+          <tr>
+            <th>Weeks (2026)</th>
+            <th>Milestone</th>
+            <th>Exit criteria</th>
+          </tr>
+          <tr>
+            <td class="mono">1–2 · Jul 20–Aug 2</td>
+            <td>Walking skeleton</td>
+            <td>
+              OTLP logs in, query out, CI running tests, on GitHub from day one
+            </td>
+          </tr>
+          <tr>
+            <td class="mono">3–6 · Aug 3–30</td>
+            <td>Metrics + traces</td>
+            <td>
+              All three signals ingested, TSDB head/WAL/segments, rollup job
+            </td>
+          </tr>
+          <tr>
+            <td class="mono">7–9 · Aug 31–Sep 20</td>
+            <td>Kubernetes</td>
+            <td>
+              <code>helm install</code> works on <code>kind</code> from a clean
+              clone
+            </td>
+          </tr>
+          <tr>
+            <td class="mono">10–11 · Sep 21–Oct 4</td>
+            <td>Polish</td>
+            <td>
+              README + architecture diagram, Datadog dogfooding, screenshots
+            </td>
+          </tr>
+          <tr>
+            <td class="mono">12 · Oct 5–11</td>
+            <td>Buffer</td>
+            <td>Public demo, write-up, breathe</td>
+          </tr>
+        </table>
+        <p>
+          Hard deadline: <strong>Datadog Summit Paris, October 15</strong>. The
+          project needs to exist and be presentable by then, which is exactly
+          why week 12 is called "buffer" and not "victory lap".
+        </p>
+        <p>
+          The full architecture spec and decision log (both shorter than this
+          post, I promise) live in the repo at
+          <a
+            href="https://github.com/mr-andrej/junkyard/blob/develop/docs/V2-ARCHITECTURE.md"
+            ><code>docs/V2-ARCHITECTURE.md</code></a
+          >, and the milestones are tracked as GitHub issues. This blog runs in
+          parallel: each post will take one slice (the OTLP receiver, the WAL,
+          crash recovery, the Helm chart) and go deeper than a commit message
+          can.
+        </p>
+        <p>
+          Next up:
+          <em
+            >Writing a spec-compliant OTLP receiver without embedding the
+            OpenTelemetry Collector</em
+          >:
+          what <code>partial_success</code> actually means, and why
+          backpressure is a feature you design, not a bug you fix. A lesson I
+          paid for in advance.
+        </p>
+
+        <div class="post-nav">
+          <a href="../index.html">← All posts</a>
+          <a
+            href="https://github.com/mr-andrej/junkyard"
+            target="_blank"
+            rel="noopener"
+            >github.com/mr-andrej/junkyard →</a
+          >
+        </div>
+      </article>
+    </main>
+
+    <footer>
+      <div class="fwrap">
+        <span>© 2026 Andrej Ilievski · Paris</span>
+        <span class="spacer"></span>
+        <a href="../feed.xml">RSS</a>
+        <a href="https://github.com/mr-andrej" target="_blank" rel="noopener"
+          >GitHub</a
+        >
+        <a
+          href="https://linkedin.com/in/mr-andrej"
+          target="_blank"
+          rel="noopener"
+          >LinkedIn</a
+        >
+        <a href="https://mrandrej.com/" target="_blank" rel="noopener"
+          >mrandrej.com</a
+        >
+      </div>
+    </footer>
+
+    <script>
+      function toggleTheme() {
+        const cur =
+          document.documentElement.getAttribute("data-theme") === "dark"
+            ? "dark"
+            : "light";
+        const next = cur === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        try {
+          localStorage.setItem("theme", next);
+        } catch (e) {}
+      }
+      window
+        .matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", (e) => {
+          let saved = null;
+          try {
+            saved = localStorage.getItem("theme");
+          } catch (err) {}
+          if (!saved) {
+            document.documentElement.setAttribute(
+              "data-theme",
+              e.matches ? "dark" : "light",
+            );
+          }
+        });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building in Public · Andrej Ilievski</title>
+<meta name="description" content="Engineering notes by Andrej Ilievski: rebuilding a personal observability platform (OTLP, a custom TSDB, Kubernetes) from scratch, in Go, in public.">
+<meta name="author" content="Andrej Ilievski">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<link rel="canonical" href="https://blog.mrandrej.com/">
+<meta property="og:title" content="Building in Public · Andrej Ilievski">
+<meta property="og:description" content="Engineering notes: rebuilding a personal observability platform (OTLP, a custom TSDB, Kubernetes) from scratch, in Go, in public.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://blog.mrandrej.com/">
+<meta property="og:image" content="https://blog.mrandrej.com/og-image.jpg">
+<meta property="og:site_name" content="Andrej Ilievski">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#181D28">
+<script>
+// Apply theme before first paint to avoid a flash of the wrong mode
+(function(){
+  var t = null;
+  try{ t = localStorage.getItem("theme"); }catch(e){}
+  if(t !== "dark" && t !== "light"){
+    t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  }
+  document.documentElement.setAttribute("data-theme", t);
+})();
+</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23181D28'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='monospace' font-size='15' font-weight='700' fill='%23AEB9E0'%3EAI%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="alternate" type="application/rss+xml" title="Andrej Ilievski · Building in Public" href="feed.xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/blog.css">
+</head>
+<body>
+
+<header>
+  <div class="hwrap">
+    <a class="wordmark" href="index.html">A.ILIEVSKI<span class="slash">/</span>BLOG</a>
+    <nav aria-label="Navigation">
+      <a href="index.html" aria-current="page">Writing</a>
+      <a href="field-guide.html">Field Guide</a>
+      <a href="https://github.com/mr-andrej/junkyard" target="_blank" rel="noopener">Junkyard</a>
+      <a href="https://mrandrej.com/" rel="noopener">Portfolio</a>
+    </nav>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme" onclick="toggleTheme()">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+
+  <div class="hero">
+    <p class="sec-label">Building in public</p>
+    <h1>Engineering notes from the junkyard<span class="accent">.</span></h1>
+    <p class="lede">I'm rebuilding <a href="https://github.com/mr-andrej/junkyard">Junkyard</a>, my Go log aggregator, into a personal observability platform: OTLP ingestion, a custom time-series database, Kubernetes deployment, and writing up every design decision along the way.</p>
+    <p class="sub">// Go · OpenTelemetry · Kubernetes · distributed systems, one post at a time</p>
+  </div>
+
+  <div class="posts">
+    <p class="sec-label">Posts</p>
+
+    <a class="post-card" href="posts/2026-07-20-rebuilding-junkyard-v2.html">
+      <p class="meta"><span class="series">JUNKYARD V2 · #1</span><span>2026-07-20</span><span>~8 min</span></p>
+      <h2>Rebuilding Junkyard: a mini-Datadog from scratch</h2>
+      <p>Why I'm throwing away a working log aggregator and rebuilding it as an OTLP-native observability platform, and the architecture I'm starting with: a deliberate ingestion pipeline, a custom TSDB, and a documented reason for every trade-off.</p>
+      <span class="read">Read →</span>
+    </a>
+
+  </div>
+
+</main>
+
+<footer>
+  <div class="fwrap">
+    <span>© 2026 Andrej Ilievski · Paris</span>
+    <span class="spacer"></span>
+    <a href="feed.xml">RSS</a>
+    <a href="https://github.com/mr-andrej" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://linkedin.com/in/mr-andrej" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://mrandrej.com/" target="_blank" rel="noopener">mrandrej.com</a>
+  </div>
+</footer>
+
+<script>
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  try{ localStorage.setItem("theme", next); }catch(e){}
+}
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
+  let saved = null;
+  try{ saved = localStorage.getItem("theme"); }catch(err){}
+  if(!saved){
+    document.documentElement.setAttribute("data-theme", e.matches ? "dark" : "light");
+  }
+});
+</script>
+
+</body>
+</html>
