@@ -44,6 +44,8 @@ func (api *APIServer) setupRoutes() {
 	// Statistics
 	api.router.HandleFunc("/api/stats", api.handleStats).Methods("GET")
 	api.router.HandleFunc("/api/timeseries", api.handleTimeSeries).Methods("GET")
+	api.router.HandleFunc("/api/timeseries/levels", api.handleTimeSeriesByLevel).Methods("GET")
+	api.router.HandleFunc("/api/errors-by-host", api.handleErrorsByHost).Methods("GET")
 }
 
 func (api *APIServer) Router() *mux.Router {
@@ -196,6 +198,51 @@ func (api *APIServer) handleTimeSeries(w http.ResponseWriter, r *http.Request) {
 		"hours":    hours,
 		"data":     data,
 	})
+}
+
+// ByLevel returns log counts grouped by interval and level
+func (api *APIServer) handleTimeSeriesByLevel(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	query := r.URL.Query()
+	interval := query.Get("interval")
+	hours := parseIntParam(query.Get("hours"), 24)
+	if hours > 336 {
+		hours = 336
+	}
+
+	data, err := api.db.GetTimeSeriesByLevel(interval, hours)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Timeseries query failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if data == nil {
+		data = []storage.LevelTimeSeriesPoint{}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"interval": interval,
+		"hours":    hours,
+		"data":     data,
+	})
+}
+
+// handleErrorsByHost returns error counts grouped by host
+func (api *APIServer) handleErrorsByHost(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	limit := parseIntParam(r.URL.Query().Get("limit"), 10)
+
+	data, err := api.db.GetErrorsByHost(limit)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Errors-by-host query failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if data == nil {
+		data = []storage.HostCount{}
+	}
+
+	json.NewEncoder(w).Encode(data)
 }
 
 // parseIntParam parses an integer query parameter with default

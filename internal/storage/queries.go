@@ -208,3 +208,82 @@ func (db *DB) GetSourceList() ([]string, error) {
 
 	return sources, nil
 }
+
+// LevelTimeSeriesPoint is a log count for a given interval and severity level
+type LevelTimeSeriesPoint struct {
+	Timestamp time.Time `json:"timestamp"`
+	Level     string    `json:"level"`
+	Count     int64     `json:"count"`
+}
+
+// GetTimeSeriesByLevel returns log counts grouped by interval AND level
+func (db *DB) GetTimeSeriesByLevel(interval string, hours int) ([]LevelTimeSeriesPoint, error) {
+	var intervalSQL string
+	switch interval {
+	case "minute":
+		intervalSQL = "strftime('%Y-%m-%d %H:%M:00', timestamp)"
+	case "5min":
+		intervalSQL = "strftime('%Y-%m-%d %H:', timestamp) || printf('%02d', CAST(strftime('%M', timestamp) AS INTEGER) / 5 * 5) || ':00'"
+	case "15min":
+		intervalSQL = "strftime('%Y-%m-%d %H:', timestamp) || printf('%02d', CAST(strftime('%M', timestamp) AS INTEGER) / 15 * 15) || ':00'"
+	default: // hour
+		intervalSQL = "strftime('%Y-%m-%d %H:00:00', timestamp)"
+	}
+
+	query := fmt.Sprintf(`
+        SELECT %s as interval, level, COUNT(*) as count
+        FROM logs
+        WHERE timestamp >= datetime('now', '-' || ? || ' hours')
+        GROUP BY interval, level
+        ORDER BY interval ASC
+    `, intervalSQL)
+
+	rows, err := db.conn.Query(query, hours)
+	if err != nil {
+		return nil, fmt.Errorf("timeseries-by-level query failed: %w", err)
+	}
+	defer rows.Close()
+
+	var points []LevelTimeSeriesPoint
+	for rows.Next() {
+		var ts, level string
+		var count int64
+		rows.Scan(&ts, &level, &count)
+		t, _ := time.Parse("2006-01-02 15:04:05", ts)
+		points = append(points, LevelTimeSeriesPoint{Timestamp: t, Level: level, Count: count})
+	}
+	return points, nil
+}
+
+// HostCount is a host with an associated log count
+type HostCount struct {
+	Host  string `json:"host"`
+	Count int64  `json:"count"`
+}
+
+// GetErrorsByHost returns error counts grouped by host, highest first
+func (db *DB) GetErrorsByHost(limit int) ([]HostCount, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	rows, err := db.conn.Query(`
+        SELECT host, COUNT(*) as count
+        FROM logs
+        WHERE level = 'error'
+        GROUP BY host
+        ORDER BY count DESC
+        LIMIT ?
+    `, limit)
+	if err != nil {
+		return nil, fmt.Errorf("errors-by-host query failed: %w", err)
+	}
+	defer rows.Close()
+
+	var result []HostCount
+	for rows.Next() {
+		var h HostCount
+		rows.Scan(&h.Host, &h.Count)
+		result = append(result, h)
+	}
+	return result, nil
+}
