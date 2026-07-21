@@ -19,8 +19,9 @@ type LogEntry struct {
 }
 
 type DB struct {
-	conn *sql.DB
-	path string
+	conn    *sql.DB
+	path    string
+	hasFTS5 bool
 }
 
 // NewDB creates a new JUNKyard database connection
@@ -39,8 +40,9 @@ func NewDB(path string) (*DB, error) {
 	conn.SetMaxOpenConns(1) // SQLite performs better with single connection
 
 	db := &DB{
-		conn: conn,
-		path: path,
+		conn:    conn,
+		path:    path,
+		hasFTS5: false,
 	}
 
 	if err := db.initialize(); err != nil {
@@ -51,7 +53,8 @@ func NewDB(path string) (*DB, error) {
 }
 
 func (db *DB) initialize() error {
-	schema := `
+	// Core schema - required for operation
+	coreSchema := `
     -- Main logs table
     CREATE TABLE IF NOT EXISTS logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,7 +73,26 @@ func (db *DB) initialize() error {
     CREATE INDEX IF NOT EXISTS idx_source ON logs(source);
     CREATE INDEX IF NOT EXISTS idx_host_timestamp ON logs(host, timestamp DESC);
     
-    -- Full-text search using FTS5 (adds ~10MB overhead but worth it)
+    -- Metadata table for JUNKyard itself
+    CREATE TABLE IF NOT EXISTS metadata (
+        key TEXT PRIMARY KEY,
+        value TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    
+    -- Store schema version
+    INSERT OR IGNORE INTO metadata (key, value) VALUES ('schema_version', '1.0');
+    INSERT OR IGNORE INTO metadata (key, value) VALUES ('created_at', datetime('now'));
+    `
+
+	_, err := db.conn.Exec(coreSchema)
+	if err != nil {
+		return err
+	}
+
+	// Optional FTS5 schema - attempt but don't fail if unavailable
+	ftsSchema := `
+    -- Full-text search using FTS5 (optional - may not be available in all builds)
     CREATE VIRTUAL TABLE IF NOT EXISTS logs_fts USING fts5(
         message, 
         content=logs, 
@@ -86,21 +108,17 @@ func (db *DB) initialize() error {
     CREATE TRIGGER IF NOT EXISTS logs_ad AFTER DELETE ON logs BEGIN
         DELETE FROM logs_fts WHERE rowid = old.id;
     END;
-    
-    -- Metadata table for JUNKyard itself
-    CREATE TABLE IF NOT EXISTS metadata (
-        key TEXT PRIMARY KEY,
-        value TEXT,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-    
-    -- Store schema version
-    INSERT OR IGNORE INTO metadata (key, value) VALUES ('schema_version', '1.0');
-    INSERT OR IGNORE INTO metadata (key, value) VALUES ('created_at', datetime('now'));
     `
 
-	_, err := db.conn.Exec(schema)
-	return err
+	// Try to enable FTS5, but continue without it if unavailable
+	if _, err := db.conn.Exec(ftsSchema); err != nil {
+		fmt.Printf("⚠️  FTS5 not available (using LIKE search instead): %v\n", err)
+		db.hasFTS5 = false
+	} else {
+		db.hasFTS5 = true
+	}
+
+	return nil
 }
 
 func (db *DB) Insert(entry *LogEntry) error {
