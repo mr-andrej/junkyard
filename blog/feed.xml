@@ -5,8 +5,15 @@
     <link>https://blog.mrandrej.com/</link>
     <description>Engineering notes: rebuilding a personal observability platform (OTLP, a custom TSDB, Kubernetes) from scratch, in Go, in public.</description>
     <language>en-us</language>
-    <lastBuildDate>Mon, 20 Jul 2026 18:00:00 +0200</lastBuildDate>
+    <lastBuildDate>Mon, 12 Oct 2026 18:00:00 +0200</lastBuildDate>
     <atom:link href="https://blog.mrandrej.com/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>A spec-compliant OTLP receiver, brought to you by a dead SSD</title>
+      <link>https://blog.mrandrej.com/posts/2026-10-12-otlp-receiver-dead-ssd.html</link>
+      <guid isPermaLink="true">https://blog.mrandrej.com/posts/2026-10-12-otlp-receiver-dead-ssd.html</guid>
+      <pubDate>Mon, 12 Oct 2026 18:00:00 +0200</pubDate>
+      <description>Post #2 was supposed to be about writing a spec-compliant OTLP receiver. Then Windows 11 corrupted my entire SSD. It's about both: partial_success, backpressure, and the value of pushing early.</description>
+    </item>
     <item>
       <title>Rebuilding Junkyard: a mini-Datadog from scratch</title>
       <link>https://blog.mrandrej.com/posts/2026-07-20-rebuilding-junkyard-v2.html</link>
