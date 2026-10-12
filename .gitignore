@@ -7,7 +7,6 @@ bin/
 
 # Go
 vendor/
-go.sum
 
 # Database
 *.db
