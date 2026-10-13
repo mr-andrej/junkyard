@@ -12,6 +12,14 @@ OTLP="http://localhost:4318"
 mkdir -p "$DEMO_DIR"
 rm -f "$DEMO_DIR"/*.db*
 
+# Go may be installed but missing from a stale terminal's PATH
+if ! command -v go >/dev/null 2>&1; then
+  for candidate in "/c/Program Files/Go/bin" "$HOME/go/bin" "$HOME/scoop/shims"; do
+    [ -x "$candidate/go" ] || [ -x "$candidate/go.exe" ] && export PATH="$PATH:$candidate" && break
+  done
+fi
+command -v go >/dev/null 2>&1 || { echo "error: go not found on PATH"; exit 1; }
+
 echo "==> Building junkyard-server"
 go build -o "$BIN" ./cmd/junkyard-server
 
