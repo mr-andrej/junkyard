@@ -178,7 +178,11 @@ func handleV2Logs(store *logstore.Store) http.HandlerFunc {
 		}
 
 		if severity := query.Get("severity"); severity != "" {
-			if n, err := strconv.Atoi(severity); err == nil && n > 0 {
+			n, err := strconv.Atoi(severity)
+			if err != nil {
+				n = int(model.SeverityNumberFromText(severity))
+			}
+			if n > 0 {
 				opts.SeverityMin = int32(n)
 			}
 		}
