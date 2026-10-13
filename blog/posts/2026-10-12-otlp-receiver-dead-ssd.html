@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      A spec-compliant OTLP receiver, brought to you by a dead SSD · Andrej
+      Ilievski
+    </title>
+    <meta
+      name="description"
+      content="Post #2 was supposed to be about writing a spec-compliant OTLP receiver. Then Windows 11 corrupted my entire SSD. It's about both: partial_success, backpressure, and the value of pushing early."
+    />
+    <meta name="author" content="Andrej Ilievski" />
+    <link
+      rel="canonical"
+      href="https://blog.mrandrej.com/posts/2026-10-12-otlp-receiver-dead-ssd.html"
+    />
+    <meta
+      property="og:title"
+      content="A spec-compliant OTLP receiver, brought to you by a dead SSD"
+    />
+    <meta
+      property="og:description"
+      content="What partial_success actually means, why backpressure is a feature, and what one (1) corrupted SSD teaches you about pushing early."
+    />
+    <meta property="og:type" content="article" />
+    <meta
+      property="og:url"
+      content="https://blog.mrandrej.com/posts/2026-10-12-otlp-receiver-dead-ssd.html"
+    />
+    <meta
+      property="og:image"
+      content="https://blog.mrandrej.com/og-image.jpg"
+    />
+    <meta property="article:published_time" content="2026-10-12" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#181D28" />
+    <script>
+      (function () {
+        var t = null;
+        try {
+          t = localStorage.getItem("theme");
+        } catch (e) {}
+        if (t !== "dark" && t !== "light") {
+          t =
+            window.matchMedia &&
+            matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+        }
+        document.documentElement.setAttribute("data-theme", t);
+      })();
+    </script>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23181D28'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='monospace' font-size='15' font-weight='700' fill='%23AEB9E0'%3EAI%3C/text%3E%3C/svg%3E"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="../favicon-32x32.png"
+    />
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Spline+Sans+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../assets/blog.css" />
+  </head>
+  <body>
+    <header>
+      <div class="hwrap">
+        <a class="wordmark" href="../index.html"
+          >A.ILIEVSKI<span class="slash">/</span>BLOG</a
+        >
+        <nav aria-label="Navigation">
+          <a href="../index.html">Writing</a>
+          <a href="../field-guide.html">Field Guide</a>
+          <a
+            href="https://github.com/mr-andrej/junkyard"
+            target="_blank"
+            rel="noopener"
+            >Junkyard</a
+          >
+          <a href="https://mrandrej.com/" target="_blank" rel="noopener"
+            >Portfolio</a
+          >
+        </nav>
+        <button
+          class="theme-toggle"
+          id="theme-toggle"
+          aria-label="Toggle theme"
+          onclick="toggleTheme()"
+        >
+          <svg
+            class="icon-moon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+          <svg
+            class="icon-sun"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="4" />
+            <path
+              d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+            />
+          </svg>
+        </button>
+        <button
+          class="burger"
+          id="burger"
+          aria-label="Menu"
+          aria-expanded="false"
+          aria-controls="mobile-nav"
+          onclick="toggleMenu()"
+        >
+          <svg
+            class="icon-bars"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 6h18M3 12h18M3 18h18" />
+          </svg>
+          <svg
+            class="icon-close"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+      <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+        <a href="../index.html">Writing</a>
+        <a href="../field-guide.html">Field Guide</a>
+        <a
+          href="https://github.com/mr-andrej/junkyard"
+          target="_blank"
+          rel="noopener"
+          >Junkyard</a
+        >
+        <a href="https://mrandrej.com/" target="_blank" rel="noopener"
+          >Portfolio</a
+        >
+      </nav>
+    </header>
+
+    <main>
+      <article>
+        <div class="post-head">
+          <p class="meta">
+            <span class="series">JUNKYARD V2 · #2</span><span>2026-10-12</span
+            ><span>~7 min read</span>
+          </p>
+          <h1>A spec-compliant OTLP receiver, brought to you by a dead SSD</h1>
+          <p class="standfirst">
+            This was supposed to be the promised post about writing a
+            spec-compliant OTLP receiver without embedding the OpenTelemetry
+            Collector. Then my laptop, running Windows 11, decided to corrupt
+            its entire SSD, and it briefly became a post about data recovery. It
+            is now about both. The OTLP receiver exists. My old data does not. I
+            am an unhappy but wiser new customer of OneDrive, and this post is
+            three days before the deadline. Yes, I know. But as Mike Tyson said
+            once, everyone has a plan and then they get punched in the SSD.
+          </p>
+        </div>
+
+        <h2>The dog ate my SSD</h2>
+        <p>
+          One night after school my laptop simply declined to boot. Not a blue
+          screen, not a sad face with a QR code, those I could have worked with
+          / had someone to blame. Instead I get a lovely message saying that
+          there is no boot partition on my SSD. In disbelief, knowing that a
+          mere 90 minutes ago the laptop was running fine and dandy, I tried
+          restarting it about 12 times. That... did nothing. Clearly...
+        </p>
+        <p>
+          I spent about <strong>6 hours trying to recover my data</strong> with
+          any software I could find claiming it was "the best". Recovery tools,
+          a live USB, command-line incantations I half understood, the usual
+          stages of grief. <br /><br />
+          Denial: it's probably just a loose connection, I opened the laptop to
+          clean it and remove + reinsert the SSD. Outcome = Pointless
+          <br /><br />
+          Anger: WELL IT WORKED FINE BARELY 2 HOURS AGO SOMEONE MUST HAVE PUT A
+          VIRUS ON MY MACHINE AS A JOKE. Yeah sure thing Mr. High Value Target.
+          <br /><br />
+          Bargaining: Please Mr Gates I have a conference to attend and maybe
+          15h of uncommited code I will never complain again!
+          <br /><br />
+          and eventually acceptance: I gave up and did a
+          <strong>clean reinstall</strong>. It was almost midnight and I was at
+          a loss for words (and for my data).
+        </p>
+        <p>
+          Here's the part where the story has a moral. Everything I had
+          <em>pushed</em> survived: the repo was on GitHub, the blog was
+          deployed, the architecture spec was committed. Everything that lived
+          only on that disk: local notes, school projects, a folder containing
+          about 21GB of mods named something like
+          <code>mods-backup-final-final(2)</code> is gone, forever, may it rest.
+          In the
+          <a href="2026-07-20-rebuilding-junkyard-v2.html">first post</a> I
+          wrote "committed early and often" as a productivity principle. Windows
+          reinterpreted it as a survival strategy.
+        </p>
+        <div class="callout amber">
+          <span class="label">Jot this one down dear and gentle reader</span>
+          <p>
+            Your boot partition is not promised to you. Your work exists exactly
+            as many times as you have pushed it. A local commit, while
+            essential, is quite fickle as it turns out. Just an unpublished fan
+            fiction. I am now an unhappy but wiser newly minted customer of
+            OneDrive, everything syncs as the Source folder is in the OneDrive,
+            and I push like the disk is already on fire. Because for all you
+            know, that hard-shutdown might have been harder than intended.
+          </p>
+        </div>
+
+        <h2>The reckoning</h2>
+        <p>
+          In post #1 there's a nice table. Week 12, October 5–11, is called
+          "buffer: public demo, write-up, breathe." As I write this it is
+          October 12 and the Datadog Summit in Paris is in
+          <strong>three days</strong>. By the original plan I should be
+          breathing. Oh sweet reader, I am not breathing. I probably look like
+          one of the victims of the "Waterloo Effect".
+        </p>
+        <p>
+          What happened between July and now is a longer post for a marginally
+          wiser man, but the short version is: life, school, and one (1) freshly
+          formatted SSD. The honest scoreboard is that the code is at week 1 of
+          a 12-week plan. This blog is called Building in Public, not Succeeding
+          on Schedule in Public, so here it is in public: the timeline slipped,
+          badly, and I reserve the right to retcon the milestone table and
+          pretend it never happened. While ridicule and complaints are welcome,
+          just make sure they're correctly addressed to
+          <a href="mailto:spam@mrandrej.com">spam@mrandrej.com</a>.
+        </p>
+        <p>
+          What I refuse to do is show up with nothing. So the scope changed from
+          "mini-Datadog" which was already impossible to "the walking skeleton,
+          but done properly": OTLP logs in, query out, tests, CI. The thing post
+          #1 said weeks 1–2 would exit with. It exits with it now. I will
+          confess that I have tried improving my understanding of Otel in the
+          meantime, partially for work and partially for this project. The main
+          lesson I've learned is that there is quite a bit to know and quite a
+          bigger bit that I do NOT know.
+        </p>
+
+        <h2>The OTLP receiver, as promised</h2>
+        <p>
+          Junkyard v2 does not embed the OpenTelemetry Collector. It implements
+          the OTLP service interfaces directly using the generated stubs from
+          <code>go.opentelemetry.io/proto/otlp</code>: a gRPC server on
+          <code>:4317</code> and an HTTP handler on <code>:4318</code> that
+          speaks both <code>application/x-protobuf</code> and
+          <code>application/json</code> on <code>POST /v1/logs</code>. The
+          reasoning is unchanged from the spec: embedding the Collector would be
+          less code, and it would hide exactly the parts worth understanding.
+          Which brings us to the two things I promised to explain.
+        </p>
+        <p>
+          <strong>What <code>partial_success</code> actually means.</strong>
+          Every OTLP export response carries an optional
+          <code>partial_success</code> field with a
+          <code>rejected_log_records</code> count and an error message. It's how
+          a server says "your request was valid, I accepted the batch, and I
+          still dropped 83 of your 1,000 records, here's why." That is a
+          completely different statement from rejecting the whole request with
+          an error status, and conflating the two is how you lose data silently
+          or retry storms are born. Most client SDKs log it and move on, which
+          is exactly why the count has to be real. Junkyard's walking skeleton
+          accepts or rejects whole batches, so on success it honestly reports
+          zero rejected records - but the field is there, populated, and not
+          decorative.
+        </p>
+        <p>
+          <strong
+            >Backpressure is a feature you design, not a bug you fix.</strong
+          >
+          The queue is a fixed-capacity Go channel, and that is the entire
+          queue. When it's full, the receiver doesn't block waiting for the disk
+          to catch up: it tells the client to go away and come back later,
+          <code>RESOURCE_EXHAUSTED</code> on gRPC, <code>503</code> with a
+          <code>Retry-After</code> header on HTTP, exactly like the spec's
+          retryable-error rules describe, and increments a dropped-batch metric
+          so the loss is visible instead of silent. A slow disk can degrade
+          Junkyard, but it can never stall every connected client behind one
+          full buffer. In post #1 I called this "a lesson I paid for in
+          advance." I have now paid for it twice, the second installment being
+          one SSD.
+        </p>
+        <p>Every request still travels the same path:</p>
+        <pre><code>receiver → normalize → [bounded channel] → batcher → single storage writer</code></pre>
+        <p>
+          The batcher accumulates until 500 records or one second, whichever
+          comes first, and hands one transaction to a single writer goroutine.
+          SQLite's single-writer limitation stops being a problem you fight and
+          becomes a property you design around. The store itself is the evolved
+          v1 design: WAL mode, indexed on timestamp and service, with
+          <code>trace_id</code>/<code>span_id</code> columns ready for the day
+          traces exist. One fun gotcha: FTS5 isn't compiled into the SQLite
+          driver on my fresh Windows install without a build tag, so full-text
+          search quietly falls back to <code>LIKE</code>. Windows has now cost
+          me one SSD and one full-text index. The score is not close.
+        </p>
+        <p>
+          And because v1's original sin was "no tests, no CI," v2 has
+          table-driven unit tests for the pipeline, the receivers, and the store
+          - including the shutdown-drain path, because a batcher that loses its
+          final partial batch on exit is just a slower way to drop data - plus
+          GitHub Actions running <code>gofmt</code>, <code>go vet</code>,
+          <code>go test</code>, and <code>go build</code> on every push. Here's
+          the whole thing working, unedited, one curl in and one curl out:
+        </p>
+        <pre><code>$ curl -X POST localhost:4318/v1/logs \
+    -H "Content-Type: application/json" -d @smoke.json
+{"partialSuccess":{}}
+
+$ curl "localhost:8080/api/v1/logs?service=smoke"
+[{"timestamp":"2026-10-12T20:26:40Z","severity_number":9,
+  "severity_text":"INFO","body":"hello from smoke test",
+  "service":"smoke"}]</code></pre>
+
+        <h2>Paris, in three days</h2>
+        <p>
+          So what do I bring to the Summit? Not the mini-Datadog, perhaps a
+          hotdog if I'm feeling peckish. A walking skeleton that does one signal
+          end to end and does it honestly, an architecture document I can
+          defend, tests that were there from day one, and a very good story
+          about why the commit graph has a three-month canyon in it. If you're a
+          Datadog SWE and you're reading this, hello again, stranger. The plan
+          changed; the point didn't.
+        </p>
+        <p>
+          Next up: metrics and the custom TSDB, on a new and significantly more
+          honest timeline. And backups. So many backups.
+        </p>
+
+        <div class="post-nav">
+          <a href="../index.html">← All posts</a>
+          <a
+            href="https://github.com/mr-andrej/junkyard"
+            target="_blank"
+            rel="noopener"
+            >github.com/mr-andrej/junkyard →</a
+          >
+        </div>
+      </article>
+    </main>
+
+    <footer>
+      <div class="fwrap">
+        <span>© 2026 Andrej Ilievski · Paris</span>
+        <span class="spacer"></span>
+        <a href="../feed.xml">RSS</a>
+        <a href="https://github.com/mr-andrej" target="_blank" rel="noopener"
+          >GitHub</a
+        >
+        <a
+          href="https://linkedin.com/in/mr-andrej"
+          target="_blank"
+          rel="noopener"
+          >LinkedIn</a
+        >
+        <a href="https://mrandrej.com/" target="_blank" rel="noopener"
+          >mrandrej.com</a
+        >
+      </div>
+    </footer>
+
+    <script>
+      function toggleTheme() {
+        const cur =
+          document.documentElement.getAttribute("data-theme") === "dark"
+            ? "dark"
+            : "light";
+        const next = cur === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        try {
+          localStorage.setItem("theme", next);
+        } catch (e) {}
+      }
+      window
+        .matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", (e) => {
+          let saved = null;
+          try {
+            saved = localStorage.getItem("theme");
+          } catch (err) {}
+          if (!saved) {
+            document.documentElement.setAttribute(
+              "data-theme",
+              e.matches ? "dark" : "light",
+            );
+          }
+        });
+      function toggleMenu() {
+        const nav = document.getElementById("mobile-nav");
+        const btn = document.getElementById("burger");
+        const open = nav.classList.toggle("open");
+        btn.setAttribute("aria-expanded", String(open));
+      }
+      // Close the mobile menu once a link is tapped
+      document.querySelectorAll("#mobile-nav a").forEach((a) => {
+        a.addEventListener("click", () => {
+          document.getElementById("mobile-nav").classList.remove("open");
+          document
+            .getElementById("burger")
+            .setAttribute("aria-expanded", "false");
+        });
+      });
+    </script>
+  </body>
+</html>

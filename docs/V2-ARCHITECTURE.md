@@ -1,6 +1,6 @@
 # Junkyard v2 — Architecture & Decision Log
 
-Status: draft (week 0)
+Status: M1 walking skeleton implemented — OTLP logs (gRPC :4317 / HTTP :4318) → bounded ingest pipeline → SQLite → `/api/v1/logs`, with CI running tests.
 Target: reproducible "mini-Datadog" observability platform — OTLP metrics, logs, and traces in, queryable UI out, deployed on Kubernetes via Helm.
 
 This document is both the design spec and the decision log. Every significant

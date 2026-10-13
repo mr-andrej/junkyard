@@ -7,10 +7,12 @@ bin/
 
 # Go
 vendor/
-go.sum
 
 # Database
 *.db
+
+# Demo artifacts
+.demo/
 *.db-shm
 *.db-wal
 

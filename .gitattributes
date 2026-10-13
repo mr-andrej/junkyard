@@ -1,0 +1,2 @@
+# Keep Go sources LF so gofmt -l . passes on Windows checkouts too.
+*.go text eol=lf
