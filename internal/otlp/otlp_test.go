@@ -334,6 +334,21 @@ func TestGRPCExport(t *testing.T) {
 	}
 }
 
+func TestNormalizeDerivesSeverityNumberFromText(t *testing.T) {
+	req := sampleRequest()
+	lr := req.GetResourceLogs()[0].GetScopeLogs()[0].GetLogRecords()[0]
+	lr.SeverityNumber = logs.SeverityNumber_SEVERITY_NUMBER_UNSPECIFIED
+	lr.SeverityText = "ERROR"
+
+	entries := Normalize(req)
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].SeverityNumber != int32(logs.SeverityNumber_SEVERITY_NUMBER_ERROR) {
+		t.Errorf("expected severity number 17 derived from text, got %d", entries[0].SeverityNumber)
+	}
+}
+
 func readAll(resp *http.Response) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	_, err := buf.ReadFrom(resp.Body)

@@ -10,6 +10,9 @@ vendor/
 
 # Database
 *.db
+
+# Demo artifacts
+.demo/
 *.db-shm
 *.db-wal
 

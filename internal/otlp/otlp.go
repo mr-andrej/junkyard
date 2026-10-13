@@ -40,6 +40,10 @@ func Normalize(req *collogs.ExportLogsServiceRequest) []model.LogEntry {
 			scopeAttrs := attrsToMap(sl.GetScope().GetAttributes())
 
 			for _, lr := range sl.GetLogRecords() {
+				sevNum := int32(lr.GetSeverityNumber())
+				if sevNum == 0 {
+					sevNum = model.SeverityNumberFromText(lr.GetSeverityText())
+				}
 				var attrs map[string]string
 				if len(scopeAttrs)+len(lr.GetAttributes()) > 0 {
 					attrs = make(map[string]string, len(scopeAttrs)+len(lr.GetAttributes()))
@@ -53,7 +57,7 @@ func Normalize(req *collogs.ExportLogsServiceRequest) []model.LogEntry {
 
 				out = append(out, model.LogEntry{
 					Timestamp:      time.Unix(0, int64(lr.GetTimeUnixNano())).UTC(),
-					SeverityNumber: int32(lr.GetSeverityNumber()),
+					SeverityNumber: sevNum,
 					SeverityText:   lr.GetSeverityText(),
 					Body:           valueToString(lr.GetBody()),
 					Service:        service,
