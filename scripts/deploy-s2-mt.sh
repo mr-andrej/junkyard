@@ -118,7 +118,7 @@ systemctl start junkyard.service
 # 7. Verify service is running
 sleep 2
 if systemctl is-active --quiet junkyard; then
-    log_info "✅ JUNKyard is running"
+    log_info "JUNKyard is running"
     systemctl status junkyard --no-pager | head -10
 else
     log_error "Failed to start JUNKyard service. Check logs with: journalctl -u junkyard -n 50"

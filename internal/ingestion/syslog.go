@@ -24,7 +24,7 @@ func NewSyslogServer(db *storage.DB, address string) (*SyslogServer, error) {
 		return nil, fmt.Errorf("failed to start syslog server: %w", err)
 	}
 
-	log.Printf("🗑️  JUNKyard Syslog server listening on %s", address)
+	log.Printf("JUNKyard Syslog server listening on %s", address)
 
 	s := &SyslogServer{
 		db:       db,
@@ -44,7 +44,7 @@ func NewSyslogServer(db *storage.DB, address string) (*SyslogServer, error) {
 			return
 		}
 		defer conn.Close()
-		log.Printf("🗑️  JUNKyard Syslog UDP listener on %s", address)
+		log.Printf("JUNKyard Syslog UDP listener on %s", address)
 		buf := make([]byte, 65535)
 		for {
 			n, remoteAddr, err := conn.ReadFromUDP(buf)

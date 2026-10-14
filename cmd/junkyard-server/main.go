@@ -20,6 +20,7 @@ import (
 	"github.com/mr-andrej/junkyard/internal/pipeline"
 	"github.com/mr-andrej/junkyard/internal/storage"
 	logstore "github.com/mr-andrej/junkyard/internal/storage/logs"
+	"github.com/mr-andrej/junkyard/internal/web"
 )
 
 var Version = "1.0.0"
@@ -43,11 +44,11 @@ func main() {
 
 	os.Setenv("JUNKYARD_VERSION", Version)
 
-	log.Printf("🗑️  Starting JUNKyard v%s", Version)
-	log.Printf("📁 Database: %s", *dbPath)
-	log.Printf("🌐 HTTP API: %s", *httpAddr)
-	log.Printf("📡 Syslog: %s", *syslogAddr)
-	log.Printf("🗓️  Retention: %d days", *retentionDays)
+	log.Printf("Starting JUNKyard v%s", Version)
+	log.Printf("Database: %s", *dbPath)
+	log.Printf("HTTP API: %s", *httpAddr)
+	log.Printf("Syslog: %s", *syslogAddr)
+	log.Printf("Retention: %d days", *retentionDays)
 
 	// Initialize database
 	db, err := storage.NewDB(*dbPath)
@@ -56,7 +57,7 @@ func main() {
 	}
 	defer db.Close()
 
-	log.Println("✅ Database initialized")
+	log.Println("Database initialized")
 
 	// v2: log store, ingest pipeline, OTLP receivers
 	logStore, err := logstore.Open(*v2DBPath)
@@ -78,6 +79,7 @@ func main() {
 
 	// v2 query API
 	apiServer.Router().HandleFunc("/api/v1/logs", handleV2Logs(logStore)).Methods("GET")
+	apiServer.Router().HandleFunc("/ui/v2/logs", web.ServeV2LogsUI).Methods("GET")
 
 	// Start HTTP server
 	httpServer := &http.Server{
@@ -88,7 +90,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("🚀 HTTP server started on %s", *httpAddr)
+		log.Printf("HTTP server started on %s", *httpAddr)
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("HTTP server error: %v", err)
 		}
@@ -114,7 +116,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("🚀 OTLP gRPC receiver started on %s", *otlpGRPCAddr)
+		log.Printf("OTLP gRPC receiver started on %s", *otlpGRPCAddr)
 		if err := otlpGRPCServer.Serve(grpcListener); err != nil {
 			log.Printf("OTLP gRPC server error: %v", err)
 		}
@@ -128,7 +130,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("🚀 OTLP HTTP receiver started on %s", *otlpHTTPAddr)
+		log.Printf("OTLP HTTP receiver started on %s", *otlpHTTPAddr)
 		if err := otlpHTTPServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("OTLP HTTP server error: %v", err)
 		}
@@ -144,7 +146,7 @@ func main() {
 			if err != nil {
 				log.Printf("Cleanup error: %v", err)
 			} else if deleted > 0 {
-				log.Printf("🧹 Cleaned up %d old logs", deleted)
+				log.Printf("Cleaned up %d old logs", deleted)
 			}
 		}
 	}()
@@ -154,14 +156,14 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	log.Println("🛑 Shutting down JUNKyard...")
+	log.Println("Shutting down JUNKyard...")
 	otlpGRPCServer.GracefulStop()
 	otlpHTTPServer.Close()
 	pipe.Shutdown() // drains the queue and flushes the final batch
 	logStore.Close()
 	syslogServer.Stop()
 	httpServer.Close()
-	log.Println("✅ JUNKyard stopped")
+	log.Println("JUNKyard stopped")
 }
 
 // handleV2Logs serves GET /api/v1/logs from the v2 log store.
