@@ -13,7 +13,7 @@ const HTML = `<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🗑️ JUNKyard - Log Aggregator</title>
+    <title>JUNKyard - Log Aggregator</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -265,7 +265,7 @@ const HTML = `<!DOCTYPE html>
 <body>
     <div class="container">
         <header>
-            <h1>🗑️ JUNKyard</h1>
+            <h1>JUNKyard</h1>
             <p class="tagline">"Throw all your logs into the junkyard."</p>
             <div class="stats-grid" id="statsGrid"></div>
         </header>
@@ -280,23 +280,23 @@ const HTML = `<!DOCTYPE html>
 
         <div class="charts-grid">
             <div class="chart-card full">
-                <div class="chart-title">📈 Log Volume Over Time</div>
+                <div class="chart-title">Log Volume Over Time</div>
                 <div class="chart-body"><canvas id="chartVolume"></canvas></div>
             </div>
             <div class="chart-card">
-                <div class="chart-title">📊 Severity Over Time</div>
+                <div class="chart-title">Severity Over Time</div>
                 <div class="chart-body"><canvas id="chartStacked"></canvas></div>
             </div>
             <div class="chart-card">
-                <div class="chart-title">⚠️ Errors by Host</div>
+                <div class="chart-title">Errors by Host</div>
                 <div class="chart-body"><canvas id="chartErrorsByHost"></canvas></div>
             </div>
             <div class="chart-card">
-                <div class="chart-title">🔴 Logs by Severity</div>
+                <div class="chart-title">Logs by Severity</div>
                 <div class="chart-body"><canvas id="chartByLevel"></canvas></div>
             </div>
             <div class="chart-card">
-                <div class="chart-title">🖥️ Top Hosts by Volume</div>
+                <div class="chart-title">Top Hosts by Volume</div>
                 <div class="chart-body"><canvas id="chartByHost"></canvas></div>
             </div>
         </div>
@@ -318,7 +318,7 @@ const HTML = `<!DOCTYPE html>
         </div>
 
         <div class="controls">
-            <input type="text" id="searchInput" placeholder="🔍 Search logs..." style="flex: 1; min-width: 200px;">
+            <input type="text" id="searchInput" placeholder="Search logs..." style="flex: 1; min-width: 200px;">
             <input type="text" id="hostFilter" placeholder="Filter by host...">
             <select id="sourceFilter">
                 <option value="">All Sources</option>
@@ -336,8 +336,8 @@ const HTML = `<!DOCTYPE html>
                 <option value="500">500 logs</option>
                 <option value="1000">1000 logs</option>
             </select>
-            <button onclick="loadLogs()">🔍 Search</button>
-            <button class="secondary" id="autoRefreshBtn" onclick="toggleAutoRefresh()">⏸ Auto-refresh</button>
+            <button onclick="loadLogs()">Search</button>
+            <button class="secondary" id="autoRefreshBtn" onclick="toggleAutoRefresh()">Auto-refresh</button>
         </div>
 
         <div class="logs-container" id="logsContainer">

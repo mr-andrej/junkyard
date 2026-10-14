@@ -21,11 +21,11 @@ Deadline: **Datadog Summit Paris, 2026-10-15** — the project must be presentab
 
 | Milestone | Scope | Dates (2026) | Status |
 |-----------|-------|--------------|--------|
-| M1 | Walking skeleton: OTLP logs, ingest pipeline, CI | Jul 20 – Aug 2 | ✅ done |
-| M2 | Metrics + traces, custom TSDB, query API | Aug 3 – Aug 30 | ⬜ not started |
-| M3 | Docker + Kubernetes + Helm on `kind` | Aug 31 – Sep 20 | ⬜ not started |
-| M4 | Polish: README, CI, Datadog dogfooding, screenshots | Sep 21 – Oct 4 | ⬜ not started |
-| M5 | Buffer: public demo, final write-up | Oct 5 – Oct 11 | ⬜ not started |
+| M1 | Walking skeleton: OTLP logs, ingest pipeline, CI | Jul 20 – Aug 2 | done |
+| M2 | Metrics + traces, custom TSDB, query API | Aug 3 – Aug 30 | not started |
+| M3 | Docker + Kubernetes + Helm on `kind` | Aug 31 – Sep 20 | not started |
+| M4 | Polish: README, CI, Datadog dogfooding, screenshots | Sep 21 – Oct 4 | not started |
+| M5 | Buffer: public demo, final write-up | Oct 5 – Oct 11 | not started |
 
 ## Where we stopped
 

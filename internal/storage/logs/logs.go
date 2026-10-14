@@ -94,7 +94,7 @@ func (s *Store) initialize() error {
 
 	// Try to enable FTS5, but continue without it if unavailable
 	if _, err := s.conn.Exec(ftsSchema); err != nil {
-		fmt.Printf("⚠️  FTS5 not available (using LIKE search instead): %v\n", err)
+		fmt.Printf("WARN: FTS5 not available (using LIKE search instead): %v\n", err)
 		s.hasFTS5 = false
 	} else {
 		s.hasFTS5 = true
