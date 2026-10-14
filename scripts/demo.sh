@@ -10,7 +10,11 @@ HTTP="http://localhost:8080"
 OTLP="http://localhost:4318"
 
 mkdir -p "$DEMO_DIR"
-rm -f "$DEMO_DIR"/*.db*
+rm -f "$DEMO_DIR"/*.db* 2>/dev/null || true
+if curl -sf "$HTTP/api/v1/logs?limit=1" >/dev/null 2>&1; then
+  echo "error: port 8080 is already serving junkyard — stop the other server first (Ctrl+C in its window)."
+  exit 1
+fi
 
 # Go may be installed but missing from a stale terminal's PATH
 if ! command -v go >/dev/null 2>&1; then
@@ -18,7 +22,15 @@ if ! command -v go >/dev/null 2>&1; then
     [ -x "$candidate/go" ] || [ -x "$candidate/go.exe" ] && export PATH="$PATH:$candidate" && break
   done
 fi
-command -v go >/dev/null 2>&1 || { echo "error: go not found on PATH"; exit 1; }
+if ! command -v go >/dev/null 2>&1; then
+  if grep -qi microsoft /proc/version 2>/dev/null; then
+    echo "error: this is WSL bash, not Git Bash — Go lives in Windows, WSL can't see it."
+    echo 'run: & "C:\Program Files\Git\bin\bash.exe" scripts/demo.sh'
+  else
+    echo "error: go not found on PATH"
+  fi
+  exit 1
+fi
 
 echo "==> Building junkyard-server"
 go build -o "$BIN" ./cmd/junkyard-server
@@ -81,5 +93,9 @@ query "q=timeout"
 echo
 echo "==> Demo over. Server still running — try your own:"
 echo "    curl \"$HTTP/api/v1/logs?service=checkout&severity=WARN\""
+echo "    or watch the live viewer: $HTTP/ui/v2/logs"
 echo "    Ctrl+C stops it (graceful shutdown drains the pipeline first)."
+if [ -z "${DEMO_NO_OPEN:-}" ]; then
+  ( explorer.exe "$HTTP/ui/v2/logs" >/dev/null 2>&1 || open "$HTTP/ui/v2/logs" >/dev/null 2>&1 || true ) &
+fi
 wait "$SERVER_PID"
