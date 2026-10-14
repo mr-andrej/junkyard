@@ -112,7 +112,7 @@ func (db *DB) initialize() error {
 
 	// Try to enable FTS5, but continue without it if unavailable
 	if _, err := db.conn.Exec(ftsSchema); err != nil {
-		fmt.Printf("⚠️  FTS5 not available (using LIKE search instead): %v\n", err)
+		fmt.Printf("WARN: FTS5 not available (using LIKE search instead): %v\n", err)
 		db.hasFTS5 = false
 	} else {
 		db.hasFTS5 = true

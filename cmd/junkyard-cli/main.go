@@ -101,7 +101,7 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Print(color.GreenString("🗑️  JUNKyard CLI v" + Version + "\n\n"))
+	fmt.Print(color.GreenString("JUNKyard CLI v" + Version + "\n\n"))
 	fmt.Print(`Usage: junk <command> [options]
 
 Commands:

@@ -116,7 +116,7 @@ junk stats
 
 **Output:**
 ```
-🗑️  JUNKyard Statistics
+JUNKyard Statistics
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Total Logs:     45,231
@@ -228,7 +228,7 @@ junk graph --level error
 
 **Output:**
 ```
-📊 JUNKyard Log Trend (Last 24 Hours)
+JUNKyard Log Trend (Last 24 Hours)
 
     400 │     ╭─╮
     350 │     │ ╰─╮

@@ -138,4 +138,4 @@ By contributing, you agree that your work will be licensed under the MIT License
 - Review [API docs](docs/API.md)
 - Open an issue for discussion
 
-Thank you for helping make JUNKyard better! 🗑️
+Thank you for helping make JUNKyard better!
